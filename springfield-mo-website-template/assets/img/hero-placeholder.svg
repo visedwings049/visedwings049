@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="420" viewBox="0 0 560 420">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e5f4a"/>
+      <stop offset="1" stop-color="#e0a83e"/>
+    </linearGradient>
+  </defs>
+  <rect width="560" height="420" rx="16" fill="url(#g)"/>
+  <g fill="#ffffff" opacity="0.9" font-family="sans-serif">
+    <text x="280" y="200" text-anchor="middle" font-size="22" font-weight="600">Replace this image</text>
+    <text x="280" y="230" text-anchor="middle" font-size="15" opacity="0.85">assets/img/hero-placeholder.svg</text>
+  </g>
+</svg>

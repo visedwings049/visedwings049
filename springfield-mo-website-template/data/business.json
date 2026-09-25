@@ -1,0 +1,60 @@
+{
+  "businessName": "Ozark Hearth & Home",
+  "tagline": "Family-owned home repair & handyman services in Springfield, MO",
+  "phone": "(417) 555-0142",
+  "phoneHref": "+14175550142",
+  "email": "hello@example.com",
+  "address": {
+    "street": "1234 E Sunshine St",
+    "city": "Springfield",
+    "state": "MO",
+    "zip": "65804"
+  },
+  "hours": [
+    { "days": "Monday – Friday", "time": "8:00 AM – 6:00 PM" },
+    { "days": "Saturday", "time": "9:00 AM – 2:00 PM" },
+    { "days": "Sunday", "time": "Closed" }
+  ],
+  "social": {
+    "facebook": "https://facebook.com/",
+    "instagram": "https://instagram.com/",
+    "google": "https://g.page/"
+  },
+  "ctaText": "Get a Free Quote",
+  "heroHeadline": "Reliable home repairs, done right the first time.",
+  "heroSubtext": "Serving Springfield and the surrounding Ozarks with honest pricing and same-week appointments.",
+  "about": "We've been fixing up homes across Greene County for over 12 years. As a small, local crew, we show up on time, explain what needs doing before we do it, and stand behind every job.",
+  "services": [
+    {
+      "title": "Repairs & Maintenance",
+      "description": "Drywall, doors, fixtures, and the everyday fixes that pile up on your to-do list."
+    },
+    {
+      "title": "Painting",
+      "description": "Interior and exterior painting with clean prep work and no shortcuts."
+    },
+    {
+      "title": "Carpentry",
+      "description": "Custom shelving, trim work, deck repair, and small remodels."
+    },
+    {
+      "title": "Seasonal Prep",
+      "description": "Gutter cleaning, weatherproofing, and getting your home ready for Missouri weather."
+    }
+  ],
+  "testimonials": [
+    {
+      "quote": "Showed up when they said they would and the price matched the estimate. Rare these days.",
+      "author": "Melissa R., Springfield"
+    },
+    {
+      "quote": "Fixed a leak two other companies couldn't figure out. Highly recommend.",
+      "author": "Tom D., Ozark"
+    },
+    {
+      "quote": "Friendly, fast, and fair pricing. We'll be calling them again.",
+      "author": "Angela P., Republic"
+    }
+  ],
+  "mapEmbedSrc": "https://www.google.com/maps?q=Springfield,MO&output=embed"
+}
