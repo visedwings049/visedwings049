@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Business Name — Springfield, MO</title>
+<meta name="description" content="Local small business website template for Springfield, MO.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="logo" href="#top" data-bind="businessName">Business Name</a>
+    <nav class="main-nav" aria-label="Primary">
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-menu">
+        <span></span><span></span><span></span>
+        <span class="sr-only">Menu</span>
+      </button>
+      <ul id="nav-menu">
+        <li><a href="#about">About</a></li>
+        <li><a href="#services">Services</a></li>
+        <li><a href="#testimonials">Reviews</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+    <a class="btn btn-primary header-cta" href="#contact" data-bind="ctaText">Get a Free Quote</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="container hero-inner">
+      <div class="hero-copy">
+        <h1 data-bind="heroHeadline">Reliable service, done right the first time.</h1>
+        <p class="hero-sub" data-bind="heroSubtext">Serving Springfield, MO and the surrounding area.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg" href="#contact" data-bind="ctaText">Get a Free Quote</a>
+          <a class="btn btn-ghost btn-lg" data-bind-href="phoneHref" data-bind-href-prefix="tel:" data-bind="phone" href="tel:">(417) 555-0142</a>
+        </div>
+      </div>
+      <div class="hero-media" aria-hidden="true">
+        <img src="assets/img/hero-placeholder.svg" alt="" width="560" height="420">
+      </div>
+    </div>
+  </section>
+
+  <section id="about" class="about">
+    <div class="container about-inner">
+      <h2>About Us</h2>
+      <p data-bind="about">About text goes here.</p>
+    </div>
+  </section>
+
+  <section id="services" class="services">
+    <div class="container">
+      <h2>What We Do</h2>
+      <div class="services-grid" id="services-grid">
+        <!-- populated by main.js -->
+      </div>
+    </div>
+  </section>
+
+  <section id="testimonials" class="testimonials">
+    <div class="container">
+      <h2>What Neighbors Are Saying</h2>
+      <div class="testimonials-grid" id="testimonials-grid">
+        <!-- populated by main.js -->
+      </div>
+    </div>
+  </section>
+
+  <section id="contact" class="contact">
+    <div class="container contact-inner">
+      <div class="contact-info">
+        <h2>Get In Touch</h2>
+        <p class="contact-lead">Tell us what you need and we'll get back to you within one business day.</p>
+
+        <ul class="contact-details">
+          <li>
+            <strong>Phone</strong>
+            <a data-bind-href="phoneHref" data-bind-href-prefix="tel:" data-bind="phone" href="tel:">(417) 555-0142</a>
+          </li>
+          <li>
+            <strong>Email</strong>
+            <a data-bind-href="email" data-bind-href-prefix="mailto:" data-bind="email" href="mailto:">hello@example.com</a>
+          </li>
+          <li>
+            <strong>Address</strong>
+            <span id="address-line">1234 E Sunshine St, Springfield, MO 65804</span>
+          </li>
+        </ul>
+
+        <h3>Hours</h3>
+        <ul class="hours-list" id="hours-list">
+          <!-- populated by main.js -->
+        </ul>
+
+        <div class="social-links" id="social-links">
+          <!-- populated by main.js -->
+        </div>
+      </div>
+
+      <div class="contact-form-wrap">
+        <form class="contact-form" id="contact-form">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required>
+
+          <label for="phone-field">Phone</label>
+          <input type="tel" id="phone-field" name="phone" required>
+
+          <label for="message">What do you need help with?</label>
+          <textarea id="message" name="message" rows="4" required></textarea>
+
+          <button type="submit" class="btn btn-primary btn-lg">Send Request</button>
+          <p class="form-note">This form doesn't send anywhere yet — wire it up to Formspree, Netlify Forms, or a backend of your choice. See the README.</p>
+        </form>
+      </div>
+    </div>
+
+    <div class="map-embed">
+      <iframe id="map-frame" src="" width="100%" height="320" style="border:0;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Business location map"></iframe>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <p>&copy; <span id="year"></span> <span data-bind="businessName">Business Name</span>. All rights reserved.</p>
+    <p class="footer-built-by">Site built by <strong>Your Web Design Business</strong> — Springfield, MO.</p>
+  </div>
+</footer>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>
