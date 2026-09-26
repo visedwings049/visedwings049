@@ -1,0 +1,25 @@
+# Default English profanity list for mutewords.
+# One word or phrase per line. Lines starting with # are comments.
+# This is a small, commonly-used starter list — replace or extend it
+# with --words / --extra-word to match your own content policy.
+
+damn
+goddamn
+hell
+ass
+asshole
+bastard
+bitch
+bullshit
+crap
+dick
+dumbass
+fuck
+fucking
+fucker
+motherfucker
+piss
+pissed
+prick
+shit
+son of a bitch
