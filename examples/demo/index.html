@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Tunnel demo — shared cursors</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  html, body { margin: 0; height: 100%; background: #111; color: #eee; font-family: system-ui, sans-serif; overflow: hidden; }
+  #hud { position: fixed; top: 8px; left: 8px; font-size: 13px; line-height: 1.5; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 8px; z-index: 10; }
+  #hud code { color: #7cf; }
+  .cursor { position: fixed; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; transition: left 60ms linear, top 60ms linear; }
+  .cursor.me { border: 2px solid #fff; }
+  .label { position: fixed; font-size: 11px; transform: translate(-50%, 10px); pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="hud">
+  connecting…
+</div>
+
+<script src="../../client/tunnel-client.js"></script>
+<script>
+  // In production, host tunnel-client.js next to your game and point
+  // serverUrl at your own deployed relay (see server/README).
+  const params = new URL(location.href).searchParams;
+  const serverUrl = params.get('server') || 'ws://localhost:8787';
+
+  const net = new Tunnel({ serverUrl, gameId: 'cursor-demo' });
+  const hud = document.getElementById('hud');
+  const cursors = new Map(); // peerId -> {el, labelEl}
+  const colors = ['#7cf', '#fc7', '#f7c', '#7fc', '#cf7', '#c7f'];
+  const colorFor = (id) => colors[id % colors.length];
+
+  function ensureCursor(id, isMe) {
+    if (cursors.has(id)) return cursors.get(id);
+    const el = document.createElement('div');
+    el.className = 'cursor' + (isMe ? ' me' : '');
+    el.style.background = colorFor(id);
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = isMe ? `you (#${id})` : `peer #${id}`;
+    label.style.color = colorFor(id);
+    document.body.appendChild(el);
+    document.body.appendChild(label);
+    const entry = { el, label };
+    cursors.set(id, entry);
+    return entry;
+  }
+
+  function moveCursor(id, x, y) {
+    const c = cursors.get(id);
+    if (!c) return;
+    c.el.style.left = x + 'px';
+    c.el.style.top = y + 'px';
+    c.label.style.left = x + 'px';
+    c.label.style.top = y + 'px';
+  }
+
+  function removeCursor(id) {
+    const c = cursors.get(id);
+    if (!c) return;
+    c.el.remove();
+    c.label.remove();
+    cursors.delete(id);
+  }
+
+  function updateHud() {
+    hud.innerHTML =
+      `room <code>${net.code || '…'}</code> — you are peer <code>#${net.peerId ?? '…'}</code> — ` +
+      `${net.peers.size} other peer(s) — rtt <code>${net.rtt ? net.rtt.toFixed(0) + 'ms' : '—'}</code><br>` +
+      `share this page's URL to invite others into the same room`;
+  }
+
+  net.on('room', () => {
+    ensureCursor(net.peerId, true);
+    updateHud();
+  });
+  net.on('peer-join', (id) => { ensureCursor(id, false); updateHud(); });
+  net.on('peer-leave', (id) => { removeCursor(id); updateHud(); });
+  net.on('rtt', updateHud);
+  net.on('error', (err) => { hud.textContent = 'error: ' + err.message; });
+
+  // Position updates are the hot path, so we pack them as raw bytes
+  // (2 x float32 = 8 bytes) instead of JSON — smallest possible frame.
+  const posBuf = new ArrayBuffer(8);
+  const posView = new DataView(posBuf);
+
+  window.addEventListener('pointermove', (e) => {
+    if (net.peerId == null) return;
+    moveCursor(net.peerId, e.clientX, e.clientY);
+    posView.setFloat32(0, e.clientX, true);
+    posView.setFloat32(4, e.clientY, true);
+    net.send(new Uint8Array(posBuf));
+  });
+
+  net.on('data', (fromPeerId, bytes) => {
+    if (bytes.byteLength !== 8) return;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const x = view.getFloat32(0, true);
+    const y = view.getFloat32(4, true);
+    ensureCursor(fromPeerId, false);
+    moveCursor(fromPeerId, x, y);
+  });
+</script>
+</body>
+</html>
