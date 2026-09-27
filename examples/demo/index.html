@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Tunnel demo — shared cursors</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  html, body { margin: 0; height: 100%; background: #111; color: #eee; font-family: system-ui, sans-serif; overflow: hidden; }
+  #hud { position: fixed; top: 8px; left: 8px; font-size: 13px; line-height: 1.5; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 8px; z-index: 10; }
+  #hud code { color: #7cf; }
+  .cursor { position: fixed; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; transition: left 60ms linear, top 60ms linear; }
+  .cursor.me { border: 2px solid #fff; }
+  .label { position: fixed; font-size: 11px; transform: translate(-50%, 10px); pointer-events: none; }
+
+  #login { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #111; z-index: 20; }
+  #login form { display: flex; flex-direction: column; gap: 10px; width: 240px; }
+  #login input, #login button { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid #444; background: #1c1c1c; color: #eee; }
+  #login .row { display: flex; gap: 8px; }
+  #login button { cursor: pointer; background: #2a2a2a; }
+  #login button:hover { background: #333; }
+  #login .msg { min-height: 1.2em; font-size: 12px; color: #f88; }
+  #login h1 { font-size: 16px; margin: 0 0 4px; }
+</style>
+</head>
+<body>
+<div id="login">
+  <form id="auth-form">
+    <h1>Sign in to play</h1>
+    <input id="server-url" placeholder="ws://localhost:8787" />
+    <input id="username" placeholder="username" autocomplete="username" />
+    <input id="password" type="password" placeholder="password (8+ chars)" autocomplete="current-password" />
+    <div class="row">
+      <button type="submit" data-action="login">Sign in</button>
+      <button type="button" data-action="register">Register</button>
+    </div>
+    <div class="msg" id="auth-msg"></div>
+  </form>
+</div>
+
+<div id="hud" style="display: none">
+  connecting…
+</div>
+
+<script src="../../client/tunnel-client.js"></script>
+<script>
+  // In production, host tunnel-client.js next to your game and point
+  // serverUrl at your own deployed relay (see server/README).
+  const params = new URL(location.href).searchParams;
+  const defaultServer = params.get('server') || 'ws://localhost:8787';
+
+  const loginEl = document.getElementById('login');
+  const formEl = document.getElementById('auth-form');
+  const serverInput = document.getElementById('server-url');
+  const usernameInput = document.getElementById('username');
+  const passwordInput = document.getElementById('password');
+  const msgEl = document.getElementById('auth-msg');
+  serverInput.value = defaultServer;
+
+  async function authAndStart(action) {
+    const serverUrl = serverInput.value.trim() || defaultServer;
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+    msgEl.textContent = '';
+    try {
+      const { token } = await Tunnel[action](serverUrl, username, password);
+      loginEl.style.display = 'none';
+      document.getElementById('hud').style.display = '';
+      startGame(serverUrl, token);
+    } catch (err) {
+      msgEl.textContent = err.message;
+    }
+  }
+
+  formEl.addEventListener('submit', (e) => { e.preventDefault(); authAndStart('login'); });
+  formEl.querySelector('[data-action="register"]').addEventListener('click', () => authAndStart('register'));
+
+  function startGame(serverUrl, token) {
+    // The player account lives on the server, not this page: the same
+    // account works for every game hosted through this relay.
+    const net = new Tunnel({ serverUrl, gameId: 'cursor-demo', token });
+    const hud = document.getElementById('hud');
+    const cursors = new Map(); // peerId -> {el, labelEl}
+    const colors = ['#7cf', '#fc7', '#f7c', '#7fc', '#cf7', '#c7f'];
+    const colorFor = (id) => colors[id % colors.length];
+
+    function ensureCursor(id, isMe) {
+      if (cursors.has(id)) return cursors.get(id);
+      const el = document.createElement('div');
+      el.className = 'cursor' + (isMe ? ' me' : '');
+      el.style.background = colorFor(id);
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.style.color = colorFor(id);
+      document.body.appendChild(el);
+      document.body.appendChild(label);
+      const entry = { el, label };
+      cursors.set(id, entry);
+      return entry;
+    }
+
+    function labelFor(id, isMe) {
+      const name = net.peerUsernames.get(id) || `peer #${id}`;
+      return isMe ? `you (${name})` : name;
+    }
+
+    function moveCursor(id, x, y) {
+      const c = cursors.get(id);
+      if (!c) return;
+      c.el.style.left = x + 'px';
+      c.el.style.top = y + 'px';
+      c.label.style.left = x + 'px';
+      c.label.style.top = y + 'px';
+    }
+
+    function removeCursor(id) {
+      const c = cursors.get(id);
+      if (!c) return;
+      c.el.remove();
+      c.label.remove();
+      cursors.delete(id);
+    }
+
+    function updateHud() {
+      hud.innerHTML =
+        `signed in as <code>${net.username || '…'}</code> — room <code>${net.code || '…'}</code> — ` +
+        `${net.peers.size} other peer(s) — rtt <code>${net.rtt ? net.rtt.toFixed(0) + 'ms' : '—'}</code><br>` +
+        `share this page's URL to invite others into the same room`;
+    }
+
+    net.on('room', () => {
+      const c = ensureCursor(net.peerId, true);
+      c.label.textContent = labelFor(net.peerId, true);
+      updateHud();
+    });
+    net.on('peer-join', (id) => {
+      const c = ensureCursor(id, false);
+      c.label.textContent = labelFor(id, false);
+      updateHud();
+    });
+    net.on('peer-leave', (id) => { removeCursor(id); updateHud(); });
+    net.on('rtt', updateHud);
+    net.on('error', (err) => { hud.textContent = 'error: ' + err.message; });
+
+    // Position updates are the hot path, so we pack them as raw bytes
+    // (2 x float32 = 8 bytes) instead of JSON — smallest possible frame.
+    const posBuf = new ArrayBuffer(8);
+    const posView = new DataView(posBuf);
+
+    window.addEventListener('pointermove', (e) => {
+      if (net.peerId == null) return;
+      moveCursor(net.peerId, e.clientX, e.clientY);
+      posView.setFloat32(0, e.clientX, true);
+      posView.setFloat32(4, e.clientY, true);
+      net.send(new Uint8Array(posBuf));
+    });
+
+    net.on('data', (fromPeerId, bytes) => {
+      if (bytes.byteLength !== 8) return;
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const x = view.getFloat32(0, true);
+      const y = view.getFloat32(4, true);
+      ensureCursor(fromPeerId, false);
+      moveCursor(fromPeerId, x, y);
+    });
+  }
+</script>
+</body>
+</html>
