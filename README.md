@@ -4,6 +4,19 @@ An add-on module for **Prophet Sniper** that turns a pastor's sermon notes into
 keyword-triggered, AI-generated looping background videos, displayed live
 while the sermon is preached.
 
+**Cost model: the only recurring cost is Higgsfield credits**, spent when you
+generate videos. Everything else runs free and offline:
+
+- the live listener defaults to **Vosk**, running entirely on-device (no API
+  key, no billing, no per-use cost);
+- animation-prompt drafting defaults to a **local template** (no model at
+  all), with an optional **local Ollama** model as an alternative — also
+  free, no API key, no billing.
+
+Neither of those has a metered/paid mode in this codebase. If a future
+change would add one, treat that as a decision to flag, not a default to
+reach for.
+
 ## How it works
 
 1. **Write sermon notes** in the Editor, marking trigger phrases inline:
