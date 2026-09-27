@@ -189,6 +189,38 @@ want to go that route, start collecting examples as you use the app (the
 Editor already keeps every phrase + its prompt) and we can build a
 fine-tuning pipeline once there's enough data to train on.
 
+## Getting the Display output into ProPresenter (or OBS/vMix/etc.)
+
+The `/display/:sessionId` page is a plain browser page, so it doesn't speak
+to other AV software directly — the standard way in is to capture it with
+**OBS Studio** (free) and expose that as a **virtual camera**, which
+ProPresenter (and most other production software) can take as a live
+Capture input, the same way it would a physical camera:
+
+1. Start a live session and get the Display URL (Control page, or
+   `prophet-sniper session start`), e.g. `http://localhost:4000/display/<id>`.
+2. In OBS: **Sources → + → Browser**, paste that URL, set width/height to
+   match your canvas (1920×1080 for the default 16:9). Leave **"Shutdown
+   source when not visible"** and **"Refresh browser when scene becomes
+   active"** unchecked — either one drops the page's WebSocket connection
+   and it has to reconnect before the next keyword trigger lands.
+3. Match **Settings → Video → Base/Output Resolution** to the same aspect
+   ratio to avoid letterboxing.
+4. Click **Start Virtual Camera** (bottom-right, or the Tools menu on older
+   OBS) — open its gear icon first and set **Output Type: Scene**, pinned to
+   this specific scene, so the virtual camera always shows the sermon
+   graphics regardless of whatever else is live in OBS's own Program view.
+5. In ProPresenter, add a Prop/Media layer → **Capture** → select **"OBS
+   Virtual Camera"** as the device.
+
+No audio routing is needed — the generated videos render muted
+(`Display.tsx`'s `<video muted>`), since they're background loops.
+
+If your production already runs on **NDI** (network video, standard in a lot
+of church AV) instead of virtual cameras, the same OBS Browser Source works
+with the free `obs-ndi` plugin's NDI Output instead of the virtual camera
+step, and ProPresenter's built-in NDI input picks it up the same way.
+
 ## Testing
 
 ```bash
