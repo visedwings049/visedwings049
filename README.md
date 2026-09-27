@@ -11,7 +11,9 @@ generate videos. Everything else runs free and offline:
   key, no billing, no per-use cost);
 - animation-prompt drafting defaults to a **local template** (no model at
   all), with an optional **local Ollama** model as an alternative — also
-  free, no API key, no billing.
+  free, no API key, no billing;
+- the optional `ndi/` broadcaster (see below) uses the free NDI SDK/Runtime
+  and `ffmpeg`, both no-cost, locally-run software.
 
 Neither of those has a metered/paid mode in this codebase. If a future
 change would add one, treat that as a decision to flag, not a default to
@@ -55,6 +57,8 @@ src/server/   Express + WebSocket server (REST API, live trigger relay,
 src/cli/      `prophet-sniper` CLI: manage sermons, export/import Higgsfield
               manifests, run live sessions from the terminal
 web/          React + Vite app: Editor, Control, Display pages
+ndi/          Standalone package: broadcasts a live session as an NDI video
+              source (no OBS/browser needed) - see ndi/README.md
 ```
 
 Data (sermons, keywords, session logs, generated videos) is stored as JSON
@@ -189,13 +193,36 @@ want to go that route, start collecting examples as you use the app (the
 Editor already keeps every phrase + its prompt) and we can build a
 fine-tuning pipeline once there's enough data to train on.
 
-## Getting the Display output into ProPresenter (or OBS/vMix/etc.)
+## Getting the output into ProPresenter (or OBS/vMix/etc.)
 
-The `/display/:sessionId` page is a plain browser page, so it doesn't speak
-to other AV software directly — the standard way in is to capture it with
-**OBS Studio** (free) and expose that as a **virtual camera**, which
-ProPresenter (and most other production software) can take as a live
-Capture input, the same way it would a physical camera:
+Two options, depending on whether you want another app in the loop:
+
+### Option A: `ndi/` — no OBS, just this repo (recommended)
+
+The [`ndi/`](ndi/) package broadcasts a live session directly as an **NDI**
+video source — no OBS, no browser window, nothing but that one process
+running alongside the server. See [`ndi/README.md`](ndi/README.md) for setup
+(it needs the NDI SDK downloaded during its own `npm install`, and `ffmpeg`
+on `PATH`) and usage. In short:
+
+```bash
+cd ndi && npm install                    # one-time; needs network access to downloads.ndi.tv
+npm start -- --session <sessionId>       # while a live session is running
+```
+
+Then in ProPresenter: Prop/Media layer → **Capture** → select the NDI
+source by name. Trade-off: hard cuts between videos rather than the
+crossfade the browser Display page does.
+
+### Option B: OBS Studio + Virtual Camera
+
+The `/display/:sessionId` page is a plain browser page, so without the `ndi/`
+package it doesn't speak to other AV software directly — the alternative is
+to capture it with **OBS Studio** (free) and expose that as a **virtual
+camera**, which ProPresenter (and most other production software) can take
+as a live Capture input, the same way it would a physical camera. This is
+more moving parts (OBS has to be running) but keeps the crossfade, and needs
+no NDI SDK/network dependency:
 
 1. Start a live session and get the Display URL (Control page, or
    `prophet-sniper session start`), e.g. `http://localhost:4000/display/<id>`.
