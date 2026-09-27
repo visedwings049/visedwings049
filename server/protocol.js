@@ -6,6 +6,7 @@
 // chose on purpose.
 //
 // Client -> Server
+//   AUTH         [0x0C][tokenLen u8][token utf8]
 //   CREATE_ROOM  [0x01][gameIdLen u8][gameId utf8]
 //   JOIN_ROOM    [0x02][gameIdLen u8][gameId utf8][codeLen u8][code utf8]
 //   DATA         [0x06][mode u8][...][payload]
@@ -15,8 +16,9 @@
 //   LEAVE        [0x0B]
 //
 // Server -> Client
-//   ROOM_OK      [0x03][yourPeerId u8][codeLen u8][code utf8][peerCount u8][peerIds u8...]
-//   PEER_JOINED  [0x04][peerId u8]
+//   AUTH_OK      [0x0D][usernameLen u8][username utf8]
+//   ROOM_OK      [0x03][yourPeerId u8][codeLen u8][code utf8][peerCount u8][(peerId u8, usernameLen u8, username utf8)...]
+//   PEER_JOINED  [0x04][peerId u8][usernameLen u8][username utf8]
 //   PEER_LEFT    [0x05][peerId u8]
 //   DATA         [0x06][fromPeerId u8][payload...]
 //   PONG         [0x08][nonce u32be]
@@ -24,6 +26,13 @@
 //
 // Room codes are short human-shareable strings (default 4 chars) drawn from
 // a base32-ish alphabet with ambiguous characters removed.
+//
+// AUTH binds a connection to a player account (see server/players.js and the
+// /register, /login HTTP endpoints for how a client obtains a token). When
+// the server requires auth, CREATE_ROOM/JOIN_ROOM are rejected with
+// AUTH_REQUIRED until AUTH succeeds; the authenticated username then travels
+// with room roster events so games can show player names instead of bare
+// peer ids, without adding any weight to the DATA hot path.
 
 const MSG = Object.freeze({
   CREATE_ROOM: 0x01,
@@ -36,6 +45,8 @@ const MSG = Object.freeze({
   PONG: 0x08,
   ERROR: 0x09,
   LEAVE: 0x0b,
+  AUTH: 0x0c,
+  AUTH_OK: 0x0d,
 });
 
 const DATA_MODE = Object.freeze({
@@ -51,6 +62,8 @@ const ERROR_CODE = Object.freeze({
   UNKNOWN_PEER: 5,
   RATE_LIMITED: 6,
   MALFORMED: 7,
+  AUTH_REQUIRED: 8,
+  BAD_TOKEN: 9,
 });
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I,O,0,1
@@ -75,16 +88,25 @@ function writeString(str) {
   return Buffer.concat([Buffer.from([strBuf.length]), strBuf]);
 }
 
-function encodeRoomOk(peerId, code, peerIds) {
+// peers: array of { id, username }
+function encodeRoomOk(peerId, code, peers) {
   const codeBuf = writeString(code);
   const head = Buffer.from([MSG.ROOM_OK, peerId]);
-  const count = Buffer.from([peerIds.length]);
-  const ids = Buffer.from(peerIds);
-  return Buffer.concat([head, codeBuf, count, ids]);
+  const count = Buffer.from([peers.length]);
+  const entries = peers.map((p) => Buffer.concat([Buffer.from([p.id]), writeString(p.username)]));
+  return Buffer.concat([head, codeBuf, count, ...entries]);
 }
 
-function encodePeerEvent(type, peerId) {
-  return Buffer.from([type, peerId]);
+function encodePeerJoined(peerId, username) {
+  return Buffer.concat([Buffer.from([MSG.PEER_JOINED, peerId]), writeString(username)]);
+}
+
+function encodePeerLeft(peerId) {
+  return Buffer.from([MSG.PEER_LEFT, peerId]);
+}
+
+function encodeAuthOk(username) {
+  return Buffer.concat([Buffer.from([MSG.AUTH_OK]), writeString(username)]);
 }
 
 function encodeError(code) {
@@ -110,7 +132,9 @@ module.exports = {
   readString,
   writeString,
   encodeRoomOk,
-  encodePeerEvent,
+  encodePeerJoined,
+  encodePeerLeft,
+  encodeAuthOk,
   encodeError,
   encodeData,
   encodePong,

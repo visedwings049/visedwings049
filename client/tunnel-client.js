@@ -8,10 +8,19 @@
  *   <script>
  *     const net = Tunnel.auto(); // reads data-server/data-game off this script tag
  *     net.on('room', code => console.log('share this link, room is', code));
- *     net.on('peer-join', id => console.log(id, 'joined'));
+ *     net.on('peer-join', (id, username) => console.log(username, 'joined'));
  *     net.on('data', (from, bytes) => console.log('got', bytes, 'from', from));
  *     net.send({ x: 1, y: 2 }); // broadcast to everyone else in the room
  *   </script>
+ *
+ * The relay also runs an optional player registry: accounts live on the
+ * server, not per-game, so one login works across every game hosted through
+ * it. Sign in before constructing a Tunnel and pass the token along:
+ *
+ *   const { token } = await Tunnel.login(serverUrl, 'wade', 'hunter22');
+ *   // or Tunnel.register(serverUrl, 'wade', 'hunter22') the first time
+ *   const net = new Tunnel({ serverUrl, gameId: 'my-game', token });
+ *   net.on('authenticated', username => console.log('signed in as', username));
  *
  * Wire format matches server/protocol.js — see PROTOCOL.md. Every frame is
  * a single WebSocket binary message; there is no JSON envelope, so relay
@@ -37,6 +46,8 @@
     PONG: 0x08,
     ERROR: 0x09,
     LEAVE: 0x0b,
+    AUTH: 0x0c,
+    AUTH_OK: 0x0d,
   };
 
   const DATA_MODE = { BROADCAST: 0x00, DIRECT: 0x01 };
@@ -49,6 +60,8 @@
     5: 'unknown peer',
     6: 'rate limited',
     7: 'malformed message',
+    8: 'authentication required',
+    9: 'invalid or expired token',
   };
 
   const textEncoder = new TextEncoder();
@@ -116,10 +129,26 @@
     gameId: 'default',
     autoJoin: true,
     roomParam: 'room',
+    token: null, // from Tunnel.register()/Tunnel.login() — omit to play as a guest
     minBackoffMs: 400,
     maxBackoffMs: 8000,
     pingIntervalMs: 5000,
   };
+
+  function toHttpUrl(serverUrl) {
+    return serverUrl.replace(/^ws:/, 'http:').replace(/^wss:/, 'https:').replace(/\/$/, '');
+  }
+
+  async function authRequest(serverUrl, path, username, password) {
+    const res = await fetch(toHttpUrl(serverUrl) + path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `request failed (${res.status})`);
+    return body; // { token, username }
+  }
 
   class Tunnel extends EventBus {
     constructor(opts = {}) {
@@ -130,10 +159,14 @@
       this.peerId = null;
       this.code = null;
       this.peers = new Set();
+      this.peerUsernames = new Map(); // peerId -> username, includes yourself once known
+      this.username = null;
       this.rtt = null;
       this.connected = false;
 
       this._ws = null;
+      this._authToken = this.opts.token || null;
+      this._authenticated = false;
       this._backoff = this.opts.minBackoffMs;
       this._pendingJoinCode = null; // set when we want a specific room on (re)connect
       this._closedByUser = false;
@@ -147,6 +180,16 @@
         // give 'this' a tick to be assigned before callers can attach listeners
         Promise.resolve().then(() => this.autoJoin());
       }
+    }
+
+    /** Create a player account on the server. Resolves to { token, username }. */
+    static register(serverUrl, username, password) {
+      return authRequest(serverUrl, '/register', username, password);
+    }
+
+    /** Sign in to an existing player account. Resolves to { token, username }. */
+    static login(serverUrl, username, password) {
+      return authRequest(serverUrl, '/login', username, password);
     }
 
     /** Build a Tunnel from a <script> tag's data-server / data-game attributes. */
@@ -210,11 +253,25 @@
       this._teardown();
     }
 
+    _canSendRoomOps() {
+      return !this._authToken || this._authenticated;
+    }
+
     _sendOrQueue(buildFrame) {
-      if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+      if (this._ws && this._ws.readyState === WebSocket.OPEN && this._canSendRoomOps()) {
         this._ws.send(buildFrame());
       } else {
         this._queuedAction = buildFrame;
+      }
+    }
+
+    _flushQueued() {
+      if (this._pendingJoinCode) {
+        this.joinRoom(this._pendingJoinCode);
+      } else if (this._queuedAction) {
+        const frame = this._queuedAction();
+        this._queuedAction = null;
+        this._ws.send(frame);
       }
     }
 
@@ -227,12 +284,11 @@
         this.connected = true;
         this._backoff = this.opts.minBackoffMs;
         this.emit('open');
-        if (this._pendingJoinCode) {
-          this.joinRoom(this._pendingJoinCode);
-        } else if (this._queuedAction) {
-          const frame = this._queuedAction();
-          this._queuedAction = null;
-          ws.send(frame);
+        if (this._authToken) {
+          // room ops stay queued until AUTH_OK comes back (see _handleMessage)
+          ws.send(concatBytes([Uint8Array.of(MSG.AUTH), writeString(this._authToken)]));
+        } else {
+          this._flushQueued();
         }
         this._startPing();
       };
@@ -241,6 +297,7 @@
 
       ws.onclose = () => {
         this.connected = false;
+        this._authenticated = false;
         this._stopPing();
         this.emit('close');
         if (!this._closedByUser) this._scheduleReconnect();
@@ -291,6 +348,14 @@
       const type = buf[0];
 
       switch (type) {
+        case MSG.AUTH_OK: {
+          const nameRead = readString(view, 1);
+          this._authenticated = true;
+          this.username = nameRead.value;
+          this.emit('authenticated', nameRead.value);
+          this._flushQueued();
+          break;
+        }
         case MSG.ROOM_OK: {
           const peerId = buf[1];
           const codeRead = readString(view, 2);
@@ -298,11 +363,20 @@
           let offset = codeRead.next;
           const count = buf[offset++];
           const peers = [];
-          for (let i = 0; i < count; i++) peers.push(buf[offset + i]);
+          const peerUsernames = new Map();
+          for (let i = 0; i < count; i++) {
+            const id = buf[offset++];
+            const nameRead = readString(view, offset);
+            offset = nameRead.next;
+            peers.push(id);
+            peerUsernames.set(id, nameRead.value);
+          }
 
           this.peerId = peerId;
           this.code = code;
           this.peers = new Set(peers.filter((id) => id !== peerId));
+          this.peerUsernames = peerUsernames;
+          this.username = this.username || peerUsernames.get(peerId);
 
           this.emit('room', code, peerId);
           if (this._onNextRoomOk) {
@@ -313,13 +387,16 @@
         }
         case MSG.PEER_JOINED: {
           const peerId = buf[1];
+          const nameRead = readString(view, 2);
           this.peers.add(peerId);
-          this.emit('peer-join', peerId);
+          this.peerUsernames.set(peerId, nameRead.value);
+          this.emit('peer-join', peerId, nameRead.value);
           break;
         }
         case MSG.PEER_LEFT: {
           const peerId = buf[1];
           this.peers.delete(peerId);
+          this.peerUsernames.delete(peerId);
           this.emit('peer-leave', peerId);
           break;
         }

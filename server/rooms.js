@@ -10,6 +10,7 @@ class Room {
     this.gameId = gameId;
     this.code = code;
     this.peers = new Map(); // peerId (number) -> ws connection
+    this.usernames = new Map(); // peerId (number) -> username
     this.nextPeerId = 1;
     this.createdAt = Date.now();
   }
@@ -22,19 +23,21 @@ class Room {
     return this.peers.size >= MAX_PEERS_PER_ROOM;
   }
 
-  addPeer(ws) {
+  addPeer(ws, username) {
     const peerId = this.nextPeerId++;
     if (peerId > 255) return null; // exhausted 1-byte id space
     this.peers.set(peerId, ws);
+    this.usernames.set(peerId, username);
     return peerId;
   }
 
   removePeer(peerId) {
     this.peers.delete(peerId);
+    this.usernames.delete(peerId);
   }
 
-  peerIds() {
-    return Array.from(this.peers.keys());
+  peerEntries() {
+    return Array.from(this.peers.keys()).map((id) => ({ id, username: this.usernames.get(id) }));
   }
 }
 
