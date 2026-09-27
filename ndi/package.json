@@ -1,0 +1,23 @@
+{
+  "name": "prophet-sniper-ndi",
+  "version": "0.1.0",
+  "description": "Broadcasts a live Prophet Sniper sermon session as an NDI video source, with no OBS or browser in the loop.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@stagetimerio/grandiose": "^0.2.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

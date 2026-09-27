@@ -1,0 +1,10 @@
+node_modules/
+dist/
+web/dist/
+data/
+*.log
+.DS_Store
+
+# Vosk offline speech models are large binaries the user downloads themselves
+web/public/models/*
+!web/public/models/README.md
