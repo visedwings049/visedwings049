@@ -62,6 +62,17 @@ export function Editor() {
     setKeywords((prev) => prev.map((k) => (k.id === id ? updated : k)));
   }
 
+  async function handleRegeneratePrompt(id: string, mode: "template" | "offline-model") {
+    setStatus(mode === "offline-model" ? "Asking the local Ollama model…" : "Regenerating…");
+    try {
+      const updated = await api.regeneratePrompt(id, mode);
+      setKeywords((prev) => prev.map((k) => (k.id === id ? updated : k)));
+      setStatus("Prompt updated.");
+    } catch (err) {
+      setStatus(String(err));
+    }
+  }
+
   async function handleExportManifest() {
     if (!activeId) return;
     const manifest = await api.getManifest(activeId);
@@ -181,10 +192,21 @@ export function Editor() {
                     <td>{k.phrase}</td>
                     <td style={{ minWidth: 320 }}>
                       <textarea
+                        // Remount when the prompt changes server-side (e.g. after
+                        // regeneration) so the uncontrolled textarea picks it up.
+                        key={k.animationPrompt}
                         style={{ minHeight: 60, width: "100%" }}
                         defaultValue={k.animationPrompt}
                         onBlur={(e) => handleKeywordChange(k.id, { animationPrompt: e.target.value })}
                       />
+                      <div className="row" style={{ marginTop: 6 }}>
+                        <button className="secondary" onClick={() => handleRegeneratePrompt(k.id, "template")}>
+                          Regenerate (template)
+                        </button>
+                        <button className="secondary" onClick={() => handleRegeneratePrompt(k.id, "offline-model")}>
+                          Regenerate (offline model)
+                        </button>
+                      </div>
                     </td>
                     <td>
                       <select defaultValue={k.model} onChange={(e) => handleKeywordChange(k.id, { model: e.target.value })}>

@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
-import { matchNext } from "../lib/matcher";
-import { isSpeechRecognitionSupported, startListening, type SpeechHandle } from "../lib/speech";
+import { buildVoskGrammar, matchNext } from "../lib/matcher";
+import { startOfflineListening, type OfflineStatus } from "../lib/offlineSpeech";
+import { isSpeechRecognitionSupported, startListening } from "../lib/speech";
 import type { Keyword, LiveSession, Sermon } from "../lib/types";
 import { connectSession, type ServerMessage } from "../lib/ws";
 
 const TRIGGER_COOLDOWN_MS = 1500;
+const MODEL_URL_STORAGE_KEY = "prophetSniper.voskModelUrl";
+const DEFAULT_MODEL_URL = "/models/vosk-model-small-en-us-0.15.tar.gz";
+
+type MicMode = "offline" | "browser";
+type MicStatus = OfflineStatus | "idle";
+
+interface ListenHandle {
+  stop: () => void;
+}
 
 export function Control() {
   const { sermonId = "" } = useParams();
@@ -15,14 +25,22 @@ export function Control() {
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [session, setSession] = useState<LiveSession | null>(null);
   const [pointer, setPointer] = useState(0);
-  const [micStatus, setMicStatus] = useState<"idle" | "listening" | "stopped" | "error">("idle");
+  const [micMode, setMicMode] = useState<MicMode>("offline");
+  const [modelUrl, setModelUrl] = useState(() => localStorage.getItem(MODEL_URL_STORAGE_KEY) ?? DEFAULT_MODEL_URL);
+  const [micStatus, setMicStatus] = useState<MicStatus>("idle");
   const [micDetail, setMicDetail] = useState("");
   const [liveTranscript, setLiveTranscript] = useState("");
   const [log, setLog] = useState<LiveSession["log"]>([]);
 
   const wsRef = useRef<ReturnType<typeof connectSession> | null>(null);
-  const speechRef = useRef<SpeechHandle | null>(null);
+  const speechRef = useRef<ListenHandle | null>(null);
+  const cancelStartRef = useRef(false);
+  const pointerRef = useRef(0);
   const lastTriggerRef = useRef<{ index: number; at: number }>({ index: -1, at: 0 });
+
+  useEffect(() => {
+    pointerRef.current = pointer;
+  }, [pointer]);
 
   useEffect(() => {
     api.getSermon(sermonId).then((s) => {
@@ -61,6 +79,7 @@ export function Control() {
     () => keywords.map((k) => ({ id: k.id, phrase: k.phrase, aliases: k.aliases })),
     [keywords]
   );
+  const grammar = useMemo(() => buildVoskGrammar(orderedKeywords), [orderedKeywords]);
 
   function fireTrigger(index: number, source: "auto" | "manual", matchedText?: string) {
     const now = Date.now();
@@ -73,24 +92,50 @@ export function Control() {
 
   function handleChunk(text: string) {
     setLiveTranscript(text);
-    const match = matchNext(text, orderedKeywords, pointer, 2);
+    const match = matchNext(text, orderedKeywords, pointerRef.current, 2);
     if (match) fireTrigger(match.index, "auto", match.matchedText);
   }
 
-  function toggleMic() {
+  function persistModelUrl(url: string) {
+    setModelUrl(url);
+    localStorage.setItem(MODEL_URL_STORAGE_KEY, url);
+  }
+
+  async function toggleMic() {
+    if (micStatus === "loading") {
+      // Cancel a still-loading offline model; the handle is stopped once it resolves.
+      cancelStartRef.current = true;
+      setMicStatus("idle");
+      return;
+    }
     if (speechRef.current) {
       speechRef.current.stop();
       speechRef.current = null;
-      setMicStatus("stopped");
+      setMicStatus("idle");
       return;
     }
-    speechRef.current = startListening(
-      (text) => handleChunk(text),
-      (status, detail) => {
-        setMicStatus(status);
-        setMicDetail(detail ?? "");
-      }
-    );
+    if (micMode === "offline") {
+      cancelStartRef.current = false;
+      setMicStatus("loading");
+      const handle = await startOfflineListening(
+        { modelUrl, grammar },
+        (text) => handleChunk(text),
+        (status, detail) => {
+          setMicStatus(status);
+          setMicDetail(detail ?? "");
+        }
+      );
+      if (cancelStartRef.current) handle.stop();
+      else speechRef.current = handle;
+    } else {
+      speechRef.current = startListening(
+        (text) => handleChunk(text),
+        (status, detail) => {
+          setMicStatus(status);
+          setMicDetail(detail ?? "");
+        }
+      );
+    }
   }
 
   async function handleEndSession() {
@@ -125,12 +170,45 @@ export function Control() {
 
       <div className="panel">
         <h3>Live listener</h3>
-        {!isSpeechRecognitionSupported() && (
-          <p className="muted">Speech recognition isn't supported in this browser — use manual triggers below (Chrome recommended).</p>
+        <div className="row" style={{ marginBottom: 10 }}>
+          <label>
+            <input
+              type="radio"
+              name="micMode"
+              checked={micMode === "offline"}
+              disabled={!!speechRef.current}
+              onChange={() => setMicMode("offline")}
+            />{" "}
+            Offline (Vosk, runs on-device, no internet needed)
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="micMode"
+              checked={micMode === "browser"}
+              disabled={!!speechRef.current}
+              onChange={() => setMicMode("browser")}
+            />{" "}
+            Browser speech recognition (sends audio to the cloud, needs internet)
+          </label>
+        </div>
+        {micMode === "offline" && (
+          <div className="row" style={{ marginBottom: 10 }}>
+            <span className="muted">Model URL:</span>
+            <input
+              style={{ flex: 1, minWidth: 260 }}
+              value={modelUrl}
+              disabled={!!speechRef.current}
+              onChange={(e) => persistModelUrl(e.target.value)}
+            />
+          </div>
+        )}
+        {micMode === "browser" && !isSpeechRecognitionSupported() && (
+          <p className="muted">Browser speech recognition isn't supported here — switch to Offline, or use manual triggers below.</p>
         )}
         <div className="row">
           <button onClick={toggleMic} disabled={session.status !== "live"}>
-            {speechRef.current ? "Stop listening" : "Start listening"}
+            {speechRef.current ? "Stop listening" : micStatus === "loading" ? "Cancel (loading model…)" : "Start listening"}
           </button>
           <span className="muted">
             mic: {micStatus} {micDetail}

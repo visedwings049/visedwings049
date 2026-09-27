@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchNext } from "../matcher.js";
+import { buildVoskGrammar, matchNext } from "../matcher.js";
 import { parseNotes } from "../parser.js";
 
 test("parseNotes extracts plain and prompt-override phrases in order", () => {
@@ -34,4 +34,19 @@ test("matchNext does not match substrings across word boundaries", () => {
   const keywords = [{ id: "a", phrase: "peace", aliases: [] }];
   assert.equal(matchNext("masterpeace is not a match", keywords, 0), null);
   assert.notEqual(matchNext("we need peace now", keywords, 0), null);
+});
+
+test("buildVoskGrammar includes whole phrases, their words, aliases, and the [unk] token", () => {
+  const keywords = [
+    { id: "a", phrase: "still water", aliases: ["calm sea"] },
+    { id: "b", phrase: "hope", aliases: [] },
+  ];
+  const grammar = buildVoskGrammar(keywords);
+  assert.ok(grammar.includes("still water"));
+  assert.ok(grammar.includes("still"));
+  assert.ok(grammar.includes("water"));
+  assert.ok(grammar.includes("calm sea"));
+  assert.ok(grammar.includes("hope"));
+  assert.ok(grammar.includes("[unk]"));
+  assert.equal(new Set(grammar).size, grammar.length, "entries should be deduplicated");
 });

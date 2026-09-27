@@ -20,10 +20,12 @@ while the sermon is preached.
 4. **Start a live session.** Open the *Control* panel (mic + manual buttons)
    on the pastor's/operator's device and the *Display* window full-screen on
    the sermon screen.
-5. While preaching, the live listener (browser speech recognition) matches
-   spoken words against the **next expected keyword** in sequence. A match —
-   or a manual "Play now" button press — advances the session and pushes the
-   matching looping video to the Display window in real time over WebSocket.
+5. While preaching, the live listener matches spoken words against the
+   **next expected keyword** in sequence, running **fully offline** by
+   default (Vosk, on-device — no audio ever leaves the machine, no internet
+   needed). A match — or a manual "Play now" button press — advances the
+   session and pushes the matching looping video to the Display window in
+   real time over WebSocket.
 
 Sequential matching (rather than matching any keyword anywhere) means the
 live listener only listens for whichever phrase comes next in the prepared
@@ -108,13 +110,71 @@ settings, and already-generated videos are preserved.
 
 ## Live listener details
 
-- Runs entirely in the Control page via the browser's Web Speech API — no
-  audio is sent to the server. Requires Chrome (or another
-  `SpeechRecognition`-capable browser); manual trigger buttons work anywhere.
-- Matches only against the next 1–2 upcoming keywords (not the whole
-  keyword list), so it advances the sermon's visuals in order.
-- Every trigger (auto or manual) is relayed over the server's `/ws` endpoint
-  to all Control and Display clients in that session, and logged.
+The Control page offers two listening modes:
+
+- **Offline (Vosk, default/recommended)** — speech recognition runs entirely
+  on-device via [Vosk](https://alphacephei.com/vosk/) compiled to WebAssembly
+  ([`vosk-browser`](https://github.com/ccoreilly/vosk-browser)). No audio
+  leaves the machine and no internet connection is needed once the model is
+  downloaded — important for venues with unreliable Wi-Fi and for not sending
+  a live sermon's audio to a third party.
+  - **Setup**: download a Vosk model from
+    [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models) (the
+    small English model, `vosk-model-small-en-us-0.15`, ~40 MB, is enough for
+    keyword spotting) and serve it as a static file — either drop the
+    extracted folder under `web/public/models/` (Vite/Express will serve it
+    at `/models/...`) or host the `.tar.gz` anywhere reachable and paste that
+    URL into the "Model URL" field in Control's Live Listener panel (saved in
+    the browser's local storage). Larger models are more accurate but slower
+    to load; the small model is intended for exactly this kind of
+    limited-vocabulary spotting.
+  - Recognition is **grammar-constrained** to this sermon's keyword phrases
+    (built from the phrase list + any aliases you set) plus a catch-all
+    `[unk]` token — this dramatically improves accuracy for a small offline
+    model versus open-vocabulary decoding, since it only ever has to choose
+    among the words that actually matter for this sermon.
+- **Browser (online)** — the original Web Speech API path (sends audio to
+  the browser vendor's cloud STT service). Useful as a fallback or for quick
+  testing without downloading a model; requires Chrome (or another
+  `SpeechRecognition`-capable browser) and internet.
+
+Either mode only matches against the next 1–2 upcoming keywords (not the
+whole keyword list), so the sermon's visuals advance in order rather than
+firing on any phrase anywhere in the script. Every trigger (auto or manual)
+is relayed over the server's `/ws` endpoint to all Control and Display
+clients in that session, and logged. Manual "Play now" buttons are always
+available as a fallback if speech recognition mishears.
+
+## Offline animation-prompt drafting
+
+Each keyword's animation prompt is auto-drafted with a deterministic,
+zero-dependency **template** (`src/core/promptBuilder.ts`) by default — no
+model required. As an alternative, you can redraft any keyword's prompt with
+a **local LLM via [Ollama](https://ollama.com)** (also fully offline, no API
+key, runs on your own machine):
+
+```bash
+ollama serve                       # in one terminal
+ollama pull llama3.2                # or another local instruct model
+npx tsx src/cli/index.ts keyword regen-prompt --keyword <id> --offline
+```
+
+or click **"Regenerate (offline model)"** next to any keyword in the Editor.
+Configure the endpoint/model with `OLLAMA_BASE_URL` (default
+`http://localhost:11434`) and `OLLAMA_MODEL` (default `llama3.2`). If Ollama
+isn't reachable, you get a clear error and the template prompt is untouched
+— there's no hard dependency on it.
+
+**Training a custom model:** both the listener's grammar and the prompt
+drafter can be improved further with a purpose-trained model (e.g. a
+fine-tuned/LoRA'd small LLM for prompt drafting, tuned specifically on
+"sermon phrase → good Higgsfield prompt" pairs, or a domain-adapted Vosk
+acoustic model for pulpit audio/preaching cadence). That needs a labeled
+dataset first — a set of real sermon phrases paired with animation prompts
+you consider good, and/or recorded pulpit audio with transcripts. If you
+want to go that route, start collecting examples as you use the app (the
+Editor already keeps every phrase + its prompt) and we can build a
+fine-tuning pipeline once there's enough data to train on.
 
 ## Testing
 

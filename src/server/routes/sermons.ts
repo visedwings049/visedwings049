@@ -7,6 +7,7 @@ import {
   importManifestResults,
   listSermons,
   mediaUrlFor,
+  regenerateKeywordPrompt,
   setSermonNotes,
   setSermonStyle,
   updateKeyword,
@@ -78,6 +79,16 @@ sermonsRouter.put("/keywords/:id", (req, res) => {
     res.json({ ...keyword, videoUrl: mediaUrlFor(keyword.sermonId, keyword.videoPath) });
   } catch (err) {
     res.status(404).json({ error: (err as Error).message });
+  }
+});
+
+sermonsRouter.post("/keywords/:id/regenerate-prompt", async (req, res) => {
+  const mode = req.body?.mode === "offline-model" ? "offline-model" : "template";
+  try {
+    const keyword = await regenerateKeywordPrompt(req.params.id, mode);
+    res.json({ ...keyword, videoUrl: mediaUrlFor(keyword.sermonId, keyword.videoPath) });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
   }
 });
 

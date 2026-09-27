@@ -25,6 +25,26 @@ export interface Match {
 }
 
 /**
+ * Builds a Vosk grammar (JSON array of words/phrases) restricted to this
+ * sermon's keyword vocabulary, dramatically improving offline recognition
+ * accuracy for a small model versus open, full-vocabulary decoding.
+ * "[unk]" is Vosk's required catch-all token for anything outside the list.
+ */
+export function buildVoskGrammar(keywords: MatchableKeyword[]): string[] {
+  const entries = new Set<string>();
+  for (const kw of keywords) {
+    for (const candidate of [kw.phrase, ...kw.aliases]) {
+      const norm = normalizeText(candidate);
+      if (!norm) continue;
+      entries.add(norm);
+      for (const word of norm.split(" ")) entries.add(word);
+    }
+  }
+  entries.add("[unk]");
+  return [...entries];
+}
+
+/**
  * Only checks the next expected keyword (and a small lookahead window), so a
  * live sermon advances sequentially instead of firing on any phrase anywhere
  * in the script.

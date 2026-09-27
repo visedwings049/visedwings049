@@ -8,6 +8,7 @@ import {
   getSermon,
   importManifestResults,
   listSermons,
+  regenerateKeywordPrompt,
   setSermonNotes,
   setSermonStyle,
 } from "../core/sermonService.js";
@@ -86,6 +87,22 @@ sermon
     console.log("\n\nKeywords:");
     for (const k of getKeywordsForSermon(s.id)) {
       console.log(`  [${k.order}] "${k.phrase}"  status=${k.videoStatus}  model=${k.model} duration=${k.duration}s`);
+    }
+  });
+
+const keyword = program.command("keyword").description("Manage individual trigger keywords");
+
+keyword
+  .command("regen-prompt")
+  .requiredOption("--keyword <id>", "Keyword id (see `sermon show`)")
+  .option("--offline", "Draft with a local Ollama model instead of the built-in template", false)
+  .action(async (opts) => {
+    try {
+      const k = await regenerateKeywordPrompt(opts.keyword, opts.offline ? "offline-model" : "template");
+      console.log(`"${k.phrase}" ->\n${k.animationPrompt}`);
+    } catch (err) {
+      console.error((err as Error).message);
+      process.exitCode = 1;
     }
   });
 

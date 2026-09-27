@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { copyFileSync, existsSync } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
+import { generatePromptWithOfflineModel } from "./offlineModel.js";
 import { contextSnippetFor, parseNotes, slugify } from "./parser.js";
 import { DEFAULT_ASPECT_RATIO, DEFAULT_DURATION, DEFAULT_MODEL, buildDefaultPrompt } from "./promptBuilder.js";
 import { loadDb, mediaPathFor, saveDb } from "./store.js";
@@ -115,6 +116,29 @@ export function updateKeyword(
   const keyword = db.keywords.find((k) => k.id === keywordId);
   if (!keyword) throw new Error(`Keyword not found: ${keywordId}`);
   Object.assign(keyword, patch);
+  saveDb(db);
+  return keyword;
+}
+
+/**
+ * Redrafts one keyword's animation prompt: "template" (default, deterministic,
+ * offline, no dependencies) or "offline-model" (a local Ollama LLM — offline,
+ * but requires Ollama running; see core/offlineModel.ts).
+ */
+export async function regenerateKeywordPrompt(
+  keywordId: string,
+  mode: "template" | "offline-model" = "template"
+): Promise<Keyword> {
+  const db = loadDb();
+  const keyword = db.keywords.find((k) => k.id === keywordId);
+  if (!keyword) throw new Error(`Keyword not found: ${keywordId}`);
+  const style = db.sermons.find((s) => s.id === keyword.sermonId)?.style ?? "";
+
+  keyword.animationPrompt =
+    mode === "offline-model"
+      ? await generatePromptWithOfflineModel(keyword.phrase, keyword.contextSnippet, style)
+      : buildDefaultPrompt(keyword.phrase, keyword.contextSnippet, style);
+
   saveDb(db);
   return keyword;
 }

@@ -26,6 +26,8 @@ export const api = {
     req<Sermon>(`/sermons/${id}/style`, { method: "PUT", body: JSON.stringify({ style }) }),
   updateKeyword: (id: string, patch: Partial<Keyword>) =>
     req<Keyword>(`/keywords/${id}`, { method: "PUT", body: JSON.stringify(patch) }),
+  regeneratePrompt: (id: string, mode: "template" | "offline-model") =>
+    req<Keyword>(`/keywords/${id}/regenerate-prompt`, { method: "POST", body: JSON.stringify({ mode }) }),
   getManifest: (sermonId: string) => req<unknown>(`/sermons/${sermonId}/manifest`),
   importResults: (sermonId: string, results: unknown[]) =>
     req<Keyword[]>(`/sermons/${sermonId}/import-results`, {
