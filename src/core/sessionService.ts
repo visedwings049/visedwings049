@@ -3,15 +3,17 @@ import { getKeywordsForSermon, mediaUrlFor } from "./sermonService.js";
 import { loadDb, saveDb } from "./store.js";
 import type { LiveSession } from "./types.js";
 
-export function startSession(sermonId: string): LiveSession {
+/** Creates a session in "idle" (pre-show setup) status; call goLive() to start it. */
+export function startSession(sermonId: string, streamUrl?: string): LiveSession {
   const db = loadDb();
   const session: LiveSession = {
     id: randomUUID(),
     sermonId,
-    status: "live",
+    status: "idle",
     pointer: 0,
-    startedAt: new Date().toISOString(),
+    streamUrl,
     log: [],
+    transcript: [],
   };
   db.sessions.push(session);
   saveDb(db);
@@ -22,12 +24,45 @@ export function getSession(sessionId: string): LiveSession | undefined {
   return loadDb().sessions.find((s) => s.id === sessionId);
 }
 
+/** Settable any time before the session ends - e.g. filled in during pre-show setup. */
+export function setStreamUrl(sessionId: string, streamUrl: string): LiveSession {
+  const db = loadDb();
+  const session = db.sessions.find((s) => s.id === sessionId);
+  if (!session) throw new Error(`Session not found: ${sessionId}`);
+  session.streamUrl = streamUrl;
+  saveDb(db);
+  return session;
+}
+
+/** Transitions an idle session to live, enabling triggers. */
+export function goLive(sessionId: string): LiveSession {
+  const db = loadDb();
+  const session = db.sessions.find((s) => s.id === sessionId);
+  if (!session) throw new Error(`Session not found: ${sessionId}`);
+  if (session.status !== "idle") throw new Error(`Session is already ${session.status}`);
+  session.status = "live";
+  session.startedAt = new Date().toISOString();
+  saveDb(db);
+  return session;
+}
+
 export function endSession(sessionId: string): LiveSession {
   const db = loadDb();
   const session = db.sessions.find((s) => s.id === sessionId);
   if (!session) throw new Error(`Session not found: ${sessionId}`);
   session.status = "ended";
   session.endedAt = new Date().toISOString();
+  saveDb(db);
+  return session;
+}
+
+/** Appends one final (non-partial) live-listener transcript chunk. */
+export function appendTranscript(sessionId: string, text: string): LiveSession {
+  const db = loadDb();
+  const session = db.sessions.find((s) => s.id === sessionId);
+  if (!session) throw new Error(`Session not found: ${sessionId}`);
+  const trimmed = text.trim();
+  if (trimmed) session.transcript.push({ ts: new Date().toISOString(), text: trimmed });
   saveDb(db);
   return session;
 }

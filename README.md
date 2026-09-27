@@ -32,9 +32,10 @@ reach for.
    is a Claude Code session with the Higgsfield MCP tools enabled (that's the
    "CLI" driving Higgsfield), calling `generate_video` for each manifest
    entry. **Import the results** back in and each keyword is marked `ready`.
-4. **Start a live session.** Open the *Control* panel (mic + manual buttons)
-   on the pastor's/operator's device and the *Display* window full-screen on
-   the sermon screen.
+4. **Start a live session.** Opening the *Control* panel creates a session in
+   a pre-show **idle** state — set the live stream URL if you have one, then
+   click **Go Live**. Open the *Display* window full-screen on the sermon
+   screen.
 5. While preaching, the live listener matches spoken words against the
    **next expected keyword** in sequence, running **fully offline** by
    default (Vosk, on-device — no audio ever leaves the machine, no internet
@@ -108,7 +109,11 @@ npx tsx src/cli/index.ts manifest import --sermon <id> -f results.json
 
 # Live sermon
 npx tsx src/cli/index.ts session start --sermon <id> --base-url http://localhost:4000
+#  -> creates a session in "idle" status; set up before going live:
+npx tsx src/cli/index.ts session set-stream-url --session <id> --url https://youtube.com/watch?v=...
+npx tsx src/cli/index.ts session go-live --session <id>
 npx tsx src/cli/index.ts session status --session <id>
+npx tsx src/cli/index.ts session transcript --session <id>
 npx tsx src/cli/index.ts session end --session <id>
 ```
 
@@ -161,6 +166,45 @@ firing on any phrase anywhere in the script. Every trigger (auto or manual)
 is relayed over the server's `/ws` endpoint to all Control and Display
 clients in that session, and logged. Manual "Play now" buttons are always
 available as a fallback if speech recognition mishears.
+
+## Pre-show setup, live stream URL, and the saved transcript
+
+Opening the Control page (or `session start` in the CLI) creates a session in
+**idle** status, not live — a deliberate pre-show step:
+
+- **Live stream URL**: a field for the stream the service is going out on
+  (YouTube/Facebook Live, an RTMP URL, whatever you use). It's just stored
+  alongside the session for now (`GET /api/sessions/:id` and the dedicated
+  `GET /api/sessions/:id/transcript` both return it) — nothing in this repo
+  consumes it yet. It's there so a later bridge (piping that stream's audio
+  into the live listener instead of the local mic, for example) has
+  something to read from the same place the transcript lives.
+- **Go Live**: only once you click this (or run `session go-live`) does the
+  session accept triggers — the mic/manual-trigger controls are disabled
+  before that, and the WS hub itself rejects `trigger` messages for a
+  non-`live` session regardless of what the UI shows.
+
+**The live listener's transcript is now persisted**, not just shown
+transiently in the Control page. Every *final* (non-partial) recognized
+utterance — from whichever engine, Vosk or the browser one — is sent to the
+server over the same WebSocket connection used for triggers, appended to the
+session's JSON record with a timestamp, and shown in a running "Transcript"
+panel on the Control page. Interim/partial results stay UI-only, as before —
+only completed utterances are saved, so the stored transcript reads as
+prose, not a stream of the same sentence being refined.
+
+This is genuinely separate from the pre-written sermon notes (`[[phrase]]`
+markers, the transcript segments shown in the Editor) — this new transcript
+is what was actually *said*, captured live, useful later for comparing
+against the prepared outline or for an archival record.
+
+Any other local process (this is the "prophet sniper can pick up from the
+same machine" part) can read the stream URL + transcript either straight off
+disk (`data/db.json`, or wherever `PROPHET_SNIPER_DATA_DIR` points), or via
+`GET http://localhost:4000/api/sessions/:id/transcript`, which returns just
+`{ sessionId, sermonId, status, streamUrl, transcript }` — a stable, minimal
+shape meant for exactly that kind of external consumer, separate from the
+full session/keywords payload the Control page itself uses.
 
 ## Offline animation-prompt drafting
 

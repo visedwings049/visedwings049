@@ -42,13 +42,20 @@ export interface SessionLogEntry {
   index: number;
 }
 
+export interface TranscriptEntry {
+  ts: string;
+  text: string;
+}
+
 export interface LiveSession {
   id: string;
   sermonId: string;
   status: "idle" | "live" | "ended";
   pointer: number;
+  streamUrl?: string;
   startedAt?: string;
   endedAt?: string;
   log: SessionLogEntry[];
+  transcript: TranscriptEntry[];
   keywords?: Keyword[];
 }

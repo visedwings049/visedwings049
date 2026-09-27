@@ -12,7 +12,7 @@ import {
   setSermonNotes,
   setSermonStyle,
 } from "../core/sermonService.js";
-import { endSession, getSession, startSession } from "../core/sessionService.js";
+import { endSession, getSession, goLive, setStreamUrl, startSession } from "../core/sessionService.js";
 import type { ManifestResult } from "../core/types.js";
 
 const program = new Command();
@@ -137,12 +137,41 @@ const session = program.command("session").description("Run a live sermon sessio
 session
   .command("start")
   .requiredOption("--sermon <id>", "Sermon id")
+  .option("--stream-url <url>", "Live stream URL for this occurrence (can also be set later with `session set-stream-url`)")
+  .option("--go-live", "Skip the idle setup step and go live immediately", false)
   .option("--base-url <url>", "Base URL of the running server", "http://localhost:4000")
   .action((opts) => {
-    const s = startSession(opts.sermon);
-    console.log(`Session ${s.id} is live.`);
+    let s = startSession(opts.sermon, opts.streamUrl);
+    if (opts.goLive) s = goLive(s.id);
+    console.log(`Session ${s.id} created (status: ${s.status}).`);
+    if (s.status === "idle") {
+      console.log(`Set up before going live: prophet-sniper session set-stream-url --session ${s.id} --url <url>`);
+      console.log(`Then:                    prophet-sniper session go-live --session ${s.id}`);
+    }
     console.log(`Control panel: ${opts.baseUrl}/control/${s.sermonId}?session=${s.id}`);
     console.log(`Display window: ${opts.baseUrl}/display/${s.id}`);
+  });
+
+session
+  .command("set-stream-url")
+  .requiredOption("--session <id>", "Session id")
+  .requiredOption("--url <url>", "Live stream URL (YouTube/Facebook Live, RTMP, etc.)")
+  .action((opts) => {
+    setStreamUrl(opts.session, opts.url);
+    console.log("Stream URL set.");
+  });
+
+session
+  .command("go-live")
+  .requiredOption("--session <id>", "Session id")
+  .action((opts) => {
+    try {
+      goLive(opts.session);
+      console.log("Session is now live.");
+    } catch (err) {
+      console.error((err as Error).message);
+      process.exitCode = 1;
+    }
   });
 
 session
@@ -163,9 +192,24 @@ session
       process.exitCode = 1;
       return;
     }
-    console.log(`status=${s.status} pointer=${s.pointer}`);
+    console.log(`status=${s.status} pointer=${s.pointer} streamUrl=${s.streamUrl ?? "(not set)"}`);
     for (const entry of s.log) {
       console.log(`  ${entry.ts}  [${entry.index}] "${entry.phrase}" (${entry.source})`);
+    }
+  });
+
+session
+  .command("transcript")
+  .requiredOption("--session <id>", "Session id")
+  .action((opts) => {
+    const s = getSession(opts.session);
+    if (!s) {
+      console.error("Session not found");
+      process.exitCode = 1;
+      return;
+    }
+    for (const entry of s.transcript) {
+      console.log(`[${entry.ts}] ${entry.text}`);
     }
   });
 

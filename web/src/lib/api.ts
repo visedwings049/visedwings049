@@ -34,8 +34,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ results }),
     }),
-  startSession: (sermonId: string) =>
-    req<LiveSession>("/sessions", { method: "POST", body: JSON.stringify({ sermonId }) }),
+  startSession: (sermonId: string, streamUrl?: string) =>
+    req<LiveSession>("/sessions", { method: "POST", body: JSON.stringify({ sermonId, streamUrl }) }),
   getSession: (id: string) => req<LiveSession>(`/sessions/${id}`),
+  setStreamUrl: (id: string, streamUrl: string) =>
+    req<LiveSession>(`/sessions/${id}/stream-url`, { method: "PUT", body: JSON.stringify({ streamUrl }) }),
+  goLive: (id: string) => req<LiveSession>(`/sessions/${id}/go-live`, { method: "POST" }),
   endSession: (id: string) => req<LiveSession>(`/sessions/${id}/end`, { method: "POST" }),
 };

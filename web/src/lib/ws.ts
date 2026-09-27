@@ -8,7 +8,18 @@ export interface PlayMessage {
   source: "auto" | "manual";
 }
 
-export type ServerMessage = PlayMessage | { type: "session_ended" } | { type: "hello" } | { type: "error"; message: string };
+export interface TranscriptMessage {
+  type: "transcript";
+  text: string;
+}
+
+export type ServerMessage =
+  | PlayMessage
+  | TranscriptMessage
+  | { type: "session_ended" }
+  | { type: "session_live" }
+  | { type: "hello" }
+  | { type: "error"; message: string };
 
 export function connectSession(sessionId: string, role: "control" | "display", onMessage: (msg: ServerMessage) => void) {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
@@ -41,6 +52,11 @@ export function connectSession(sessionId: string, role: "control" | "display", o
     sendTrigger(index: number, source: "auto" | "manual", matchedText?: string) {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "trigger", index, source, matchedText }));
+      }
+    },
+    sendTranscript(text: string) {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "transcript", text }));
       }
     },
     close() {

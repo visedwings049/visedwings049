@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
-import { getSession, triggerKeywordAtIndex } from "../../core/sessionService.js";
+import { appendTranscript, getSession, triggerKeywordAtIndex } from "../../core/sessionService.js";
 
 export type Role = "control" | "display";
 
@@ -26,7 +26,7 @@ export function attachHub(wss: WebSocketServer): void {
     ws.send(JSON.stringify({ type: "hello", sessionId, role }));
 
     ws.on("message", (raw) => {
-      let msg: { type?: string; index?: number; matchedText?: string; source?: "auto" | "manual" };
+      let msg: { type?: string; index?: number; matchedText?: string; source?: "auto" | "manual"; text?: string };
       try {
         msg = JSON.parse(raw.toString());
       } catch {
@@ -47,6 +47,15 @@ export function attachHub(wss: WebSocketServer): void {
             pointer: result.session.pointer,
             source,
           });
+        } catch (err) {
+          ws.send(JSON.stringify({ type: "error", message: (err as Error).message }));
+        }
+      } else if (msg.type === "transcript" && typeof msg.text === "string") {
+        try {
+          const session = getSession(sessionId);
+          if (!session || session.status !== "live") return;
+          appendTranscript(sessionId, msg.text);
+          broadcast(sessionId, { type: "transcript", text: msg.text }, ["control"]);
         } catch (err) {
           ws.send(JSON.stringify({ type: "error", message: (err as Error).message }));
         }

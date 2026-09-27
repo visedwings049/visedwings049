@@ -40,14 +40,23 @@ export interface SessionLogEntry {
   index: number;
 }
 
+export interface TranscriptEntry {
+  ts: string;
+  text: string;
+}
+
 export interface LiveSession {
   id: string;
   sermonId: string;
   status: "idle" | "live" | "ended";
   pointer: number;
+  /** Set before going live, e.g. a YouTube/Facebook Live or RTMP URL for the audio/video source to bridge in later. */
+  streamUrl?: string;
   startedAt?: string;
   endedAt?: string;
   log: SessionLogEntry[];
+  /** Final (non-partial) live-listener transcript chunks, in order. */
+  transcript: TranscriptEntry[];
 }
 
 export interface DB {
