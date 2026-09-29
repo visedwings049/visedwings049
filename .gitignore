@@ -1,0 +1,23 @@
+# Secrets - never commit
+.env
+
+# Build output
+build/
+dist/
+installer/*.exe
+installer/*.dmg
+*.spec.bak
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Runtime/user data that shouldn't be in source control
+jffj_error.log
+assets/library/Arico/.thumbs/
+
+# OS cruft
+.DS_Store
+Thumbs.db
