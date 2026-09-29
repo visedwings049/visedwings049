@@ -1,0 +1,98 @@
+name: Build macOS app
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Sanity-check imports before packaging
+        run: |
+          python3 -c "
+          import jffj_desktop
+          from jffj import mail_out, folder_watch, media, presets, paths, settings, render
+          print('all modules import cleanly on macOS Python', __import__('sys').version)
+          "
+
+      - name: Build .app with PyInstaller
+        run: pyinstaller JFFJ.spec --noconfirm --clean
+
+      - name: Verify bundle structure
+        run: |
+          test -d dist/JFFJ.app || (echo "::error::JFFJ.app was not produced" && exit 1)
+          test -x dist/JFFJ.app/Contents/MacOS/JFFJ || (echo "::error::main executable missing/not executable" && exit 1)
+          test -f dist/JFFJ.app/Contents/Info.plist || (echo "::error::Info.plist missing" && exit 1)
+          echo "--- bundle icon check ---"
+          find dist/JFFJ.app -iname "*.icns" | head -5
+          echo "--- bundled sample images count ---"
+          find dist/JFFJ.app -path "*/assets/library/Arico/*" -name "*.png" | wc -l
+          echo "--- bundled music/sfx/splash ---"
+          find dist/JFFJ.app -path "*/assets/music/*" -name "*.mp3"
+          find dist/JFFJ.app -path "*/assets/sfx/*" \( -name "*.mp3" -o -name "*.wav" \)
+          find dist/JFFJ.app -path "*/assets/splash/*" -name "*.mp4"
+
+      - name: Smoke test - launch headless and confirm no crash
+        run: |
+          cd dist/JFFJ.app/Contents/MacOS
+          QT_QPA_PLATFORM=offscreen ./JFFJ > /tmp/jffj_stdout.log 2>&1 &
+          APP_PID=$!
+          sleep 10
+          if kill -0 $APP_PID 2>/dev/null; then
+            echo "App is still running after 10s - no startup crash."
+            kill $APP_PID
+            wait $APP_PID 2>/dev/null || true
+            RESULT=0
+          else
+            echo "::error::App exited on its own within 10s - likely a startup crash."
+            RESULT=1
+          fi
+          echo "--- app stdout/stderr ---"
+          cat /tmp/jffj_stdout.log || true
+          exit $RESULT
+
+      - name: Check user data directory was created correctly (no Documents-folder prompt needed)
+        run: |
+          DATA_DIR="$HOME/Library/Application Support/JFFJ"
+          test -d "$DATA_DIR" || (echo "::error::Data dir was not created at $DATA_DIR" && exit 1)
+          test -f "$DATA_DIR/.env" || (echo "::error::.env was not seeded" && exit 1)
+          IMG_COUNT=$(find "$DATA_DIR/Library/Arico" -type f \( -name "*.png" -o -name "*.jpeg" \) 2>/dev/null | wc -l)
+          echo "Seeded image count: $IMG_COUNT"
+          if [ "$IMG_COUNT" -lt 100 ]; then
+            echo "::error::Expected ~110 seeded sample images, found $IMG_COUNT"
+            exit 1
+          fi
+
+      - name: Package into .dmg
+        run: |
+          mkdir -p dist/dmg_root
+          cp -R dist/JFFJ.app dist/dmg_root/
+          ln -s /Applications dist/dmg_root/Applications
+          hdiutil create -volname "JFFJ Card Generator" -srcfolder dist/dmg_root -ov -format UDZO JFFJ_Installer.dmg
+
+      - name: Upload .dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: JFFJ-macOS-dmg
+          path: JFFJ_Installer.dmg
+
+      - name: Upload raw .app bundle (for debugging if the smoke test fails)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: JFFJ-app-bundle
+          path: dist/JFFJ.app

@@ -88,6 +88,8 @@ def main():
     icon.resize((512, 512), Image.LANCZOS).save(OUT / "jffj_icon.png")
     icon.save(OUT / "jffj.ico", sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])
     print("wrote", OUT / "jffj.ico")
+    icon.save(OUT / "jffj.icns", sizes=[(16, 16), (32, 32), (64, 64), (128, 128), (256, 256), (512, 512), (1024, 1024)])
+    print("wrote", OUT / "jffj.icns")
 
 
 if __name__ == "__main__":

@@ -10,13 +10,22 @@ FROZEN = getattr(sys, "frozen", False)
 
 if FROZEN:
     RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
-    DATA_DIR = Path.home() / "Documents" / "JFFJ"
+    if sys.platform == "darwin":
+        # ~/Documents is one of macOS's TCC-protected folders - programmatic (non-dialog)
+        # access triggers a one-time permission prompt, and a denial breaks the app silently.
+        # ~/Library/Application Support isn't protected, and is the macOS convention anyway.
+        DATA_DIR = Path.home() / "Library" / "Application Support" / "JFFJ"
+    else:
+        DATA_DIR = Path.home() / "Documents" / "JFFJ"
 else:
     RESOURCE_DIR = Path(__file__).resolve().parent.parent
     DATA_DIR = RESOURCE_DIR
 
 FONTS_DIR = RESOURCE_DIR / "assets" / "fonts"
-ICON_PATH = RESOURCE_DIR / "assets" / "jffj.ico"
+# Qt has no built-in .ico/.icns image support, so the runtime app/window icon uses the plain
+# PNG (Qt loads that reliably on every platform). The .ico/.icns files are packaging-only -
+# used directly by JFFJ.spec for the Windows EXE resource and the macOS bundle's Info.plist.
+ICON_PATH = RESOURCE_DIR / "assets" / "jffj_icon.png"
 SFX_DIR = RESOURCE_DIR / "assets" / "sfx"
 MUSIC_DIR = RESOURCE_DIR / "assets" / "music"
 SPLASH_DIR = RESOURCE_DIR / "assets" / "splash"
