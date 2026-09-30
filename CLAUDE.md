@@ -7,7 +7,7 @@ schedule on the owner's own machine.
 
 ## What this is
 
-A Streamlit dashboard with two initial modules (more to be added later):
+A Streamlit dashboard, growing module by module:
 
 1. **Goals tracker** — log personal goals, check them off daily, see streaks, get a
    daily email summary.
@@ -15,6 +15,14 @@ A Streamlit dashboard with two initial modules (more to be added later):
    assignment list, flag missing/late work with days-past-due, get a daily email summary.
 3. **Budget & spending** — pull transactions/balances from Era Context's REST API,
    set budgets per category, track spend vs. budget, get a report email.
+4. **Card Hunting (TCG deal finder)** — across Star Wars Unlimited, Cyberpunk CCG,
+   Lorcana, One Piece, Pokemon, and Magic: The Gathering: track cards worth $30+
+   (market value derived from eBay sold listings) and surface active eBay listings
+   priced $15+ under that value. Active-listing data source (eBay Browse API vs.
+   scraping) is still undecided — see `docs/ACTION_PLAN.md` Module 4.
+5. **Rip Hunters inventory & value** — not yet scoped here; there's already a local
+   Streamlit page for this on the owner's machine that a local session should locate
+   before deciding whether to keep it standalone or fold it into this dashboard.
 
 See the full architecture and build order in `docs/ACTION_PLAN.md`.
 

@@ -12,6 +12,8 @@ dashboard/
     1_Goals.py
     2_Wade_Grades.py
     3_Budget.py
+    4_Card_Hunting.py
+    5_Rip_Hunters.py
   data/
     dashboard.db          # SQLite (local file, gitignored)
   modules/
@@ -26,6 +28,14 @@ dashboard/
       era_client.py           # Era Context REST API client (transactions, balances)
       models.py                 # Budget, Category, CategoryMap tables (local cache/overrides)
       service.py                 # spend-vs-budget calc, categorization, alerts
+    card_hunting/
+      market_value.py          # derives current market value per card from eBay sold listings
+      ebay_client.py             # active-listing source for card_hunting — TBD, see Module 4
+      models.py                    # TrackedCard, MarketValueSnapshot, DealListing tables
+      service.py                    # >=$30 filter, >=$15-under-market deal detection
+    rip_hunters/
+      # inventory/value module — references the existing local Rip Hunters Streamlit
+      # page already on this machine; local Claude session locates and integrates it
     email/
       sender.py                # Gmail SMTP wrapper (app password, from .env)
       templates/
@@ -89,6 +99,46 @@ cron/Task Scheduler (daily trigger — Streamlit doesn't run background jobs its
 - **Daily or weekly email:** categories over/near budget, total spend vs. total
   budget for the period, biggest transactions since last report
 
+## Module 4 — Card Hunting (TCG deal finder)
+
+Games in scope: Star Wars Unlimited, Cyberpunk CCG, Lorcana, One Piece, Pokemon,
+Magic: The Gathering.
+
+- **Market value source:** derived in-house from **eBay sold/completed listings**
+  (average of recent sold comps per card) rather than a third-party pricing API —
+  decided so the module doesn't depend on TCGplayer/PriceCharting access.
+  `market_value.py` computes and caches this per card.
+- **Card universe filter:** only track cards whose computed market value is
+  **$30 or greater**; anything below that threshold is ignored.
+- **Active-listing source — OPEN ITEM, not yet decided:** the module needs a feed of
+  *current, active* eBay listings to compare against market value (separate from the
+  sold listings used for market value itself). Two paths considered, not chosen yet:
+  - Official eBay Browse API (OAuth app credentials, ToS-compliant, rate-limited)
+  - Scraping eBay search result pages (no signup, but against eBay's ToS, fragile to
+    page-layout changes, and risky to run on a daily schedule)
+  Decide this before building `ebay_client.py` — flagged as a feasibility spike in
+  the build order below.
+- **Deal detection:** `service.py` flags any active listing priced **$15 or more
+  below** that card's current computed market value, per game.
+- **Data model:** `TrackedCard(id, game, name, set, variant)`,
+  `MarketValueSnapshot(card_id, value, computed_at, sample_size)`,
+  `DealListing(card_id, ebay_item_id, price, discount_vs_market, found_at, url)`
+- **Streamlit page:** browse tracked cards by game, current market value, list of
+  live deal listings sorted by biggest discount, link out to each eBay listing
+- **Report email:** new deals found since last run, sorted by discount size
+
+## Module 5 — Rip Hunters Inventory & Value
+
+- This module is **not being built fresh** — there's already a local Streamlit page
+  for Rip Hunters card tracking on the owner's machine. A *local* Claude Code session
+  (not this cloud one) can locate it directly and either read from it or fold it into
+  this dashboard as its own page.
+- **Open item:** once located locally, decide whether it stays a standalone page,
+  gets moved into `modules/rip_hunters/`, or just gets linked/embedded from this
+  dashboard.
+- This entry exists so the module isn't forgotten while the rest of the plan is
+  built out; no architecture decisions made here yet.
+
 ## Build order
 
 1. Scaffold repo + SQLite models + empty Streamlit shell
@@ -103,6 +153,15 @@ cron/Task Scheduler (daily trigger — Streamlit doesn't run background jobs its
    (pull one month of transactions — validate before building the full model)
 9. Budget module: categories, budget-setting UI, spend-vs-budget page
 10. Budget report email, wire into `run_daily.py`
+11. Decide eBay active-listing access path (Browse API vs. scraping) — feasibility
+    spike before writing `ebay_client.py`
+12. Build `market_value.py` against eBay sold listings for a handful of test cards
+    per game, validate the $30+ filter and averaging approach
+13. Card Hunting module: full card universe per game, deal detection ($15+ under
+    market), Streamlit page
+14. Card Hunting report email, wire into `run_daily.py`
+15. Locate the existing local Rip Hunters Streamlit page (local Claude session task)
+    and decide standalone vs. integrated vs. linked
 
 ## Notes
 
@@ -110,5 +169,9 @@ cron/Task Scheduler (daily trigger — Streamlit doesn't run background jobs its
   most likely to need maintenance after a TeacherEase UI change.
 - The budget module depends on Era Context's REST API being available on your plan —
   treat step 8 as a feasibility spike before committing to the rest of Module 3.
+- The Card Hunting module's active-listing source (Module 4) is still undecided —
+  don't start `ebay_client.py` until step 11 resolves it.
+- Rip Hunters (Module 5) requires a local session to locate the existing page; this
+  cloud session has no access to the local filesystem where it lives.
 - This must run locally (not in a cloud session): it stores real login credentials,
-  real bank API keys, and sends real email on a schedule.
+  real bank/marketplace API keys, and sends real email on a schedule.
