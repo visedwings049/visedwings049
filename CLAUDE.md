@@ -24,6 +24,10 @@ A Streamlit dashboard, growing module by module:
 5. **Rip Hunters inventory & value** — not yet scoped here; there's already a local
    Streamlit page for this on the owner's machine that a local session should locate
    before deciding whether to keep it standalone or fold it into this dashboard.
+6. **Job Search Progress** — ingests a custom export built out of Skill Surge (the
+   job-hunting app in use); tracks applications with daily/weekly counts to start,
+   more stats to be decided once a real export exists. Export format not yet built —
+   see `docs/ACTION_PLAN.md` Module 6.
 
 See the full architecture and build order in `docs/ACTION_PLAN.md`.
 

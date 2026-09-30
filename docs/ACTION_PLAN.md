@@ -14,6 +14,7 @@ dashboard/
     3_Budget.py
     4_Card_Hunting.py
     5_Rip_Hunters.py
+    6_Job_Search.py
   data/
     dashboard.db          # SQLite (local file, gitignored)
   modules/
@@ -36,12 +37,17 @@ dashboard/
     rip_hunters/
       # inventory/value module — references the existing local Rip Hunters Streamlit
       # page already on this machine; local Claude session locates and integrates it
+    job_search/
+      importer.py               # reads a Skill Surge export (format TBD), upserts applications
+      models.py                    # Application(id, company, role, applied_date, status, source)
+      service.py                    # daily/weekly counts; further stats TBD
     email/
       sender.py                # Gmail SMTP wrapper (app password, from .env)
       templates/
         goals_report.html.j2
         grades_report.html.j2
         budget_report.html.j2
+        job_search_report.html.j2
   scheduler/
     run_daily.py            # cron/Task Scheduler entrypoint: scrape + check-ins + send emails
   config/
@@ -147,6 +153,25 @@ Magic: The Gathering.
 - This entry exists so the module isn't forgotten while the rest of the plan is
   built out; no architecture decisions made here yet.
 
+## Module 6 — Job Search Progress
+
+- **Data source:** a custom export built out of Skill Surge (the app used for job
+  hunting) — format and exact fields **not yet decided**; `importer.py` will need to
+  target whatever export shape gets built there (likely CSV, one row per
+  application).
+- **Data model (initial guess, will firm up with the export format):**
+  `Application(id, company, role, applied_date, status, source)`
+- **Stats — only the basics are decided so far:**
+  - applications submitted today
+  - applications submitted this week
+  - other stats (response rate, interview conversion, time-to-response, etc.) — TBD,
+    to be added once there's real export data to work from
+- **Streamlit page:** applications list/table, daily and weekly counts, trend over
+  time
+- **Report email:** daily and/or weekly summary — cadence TBD alongside the stats
+- **Open items:** (1) finalize the Skill Surge export format, (2) decide the full
+  stat list beyond daily/weekly counts, (3) decide email cadence
+
 ## Build order
 
 1. Scaffold repo + SQLite models + empty Streamlit shell
@@ -170,6 +195,11 @@ Magic: The Gathering.
 14. Card Hunting report email, wire into `run_daily.py`
 15. Locate the existing local Rip Hunters Streamlit page (local Claude session task)
     and decide standalone vs. integrated vs. linked
+16. Build the Skill Surge export and finalize its format
+17. `importer.py` against a real export sample; Job Search module: daily/weekly
+    counts, Streamlit page
+18. Decide the rest of the stat list + email cadence, then build the report email
+    and wire into `run_daily.py`
 
 ## Notes
 
@@ -184,5 +214,8 @@ Magic: The Gathering.
   importer, not an automatic daily pull like the other modules.
 - Rip Hunters (Module 5) requires a local session to locate the existing page; this
   cloud session has no access to the local filesystem where it lives.
+- Job Search Progress (Module 6) is blocked on the Skill Surge export not existing
+  yet — don't start `importer.py` until that export is built and its format known.
+  Its stat list beyond daily/weekly counts is also still open.
 - This must run locally (not in a cloud session): it stores real login credentials,
   real bank/marketplace API keys, and sends real email on a schedule.
