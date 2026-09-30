@@ -112,6 +112,9 @@ Magic: The Gathering.
   `MarketValueSnapshot`. Re-running the import (after a fresh Collectr export)
   refreshes values — this is a manual/periodic re-export, not a live API pull, since
   Collectr access here is via export file, not an API.
+  **Cost:** ~$4/month for the Collectr tier that enables export, vs. PriceCharting's
+  official API at $49/month for the same "get market value into the app" job — the
+  deciding factor for going with Collectr.
 - **Card universe filter:** the $30+ threshold is applied by how the Collectr
   collection itself is filtered before export, not recomputed by the app — the
   importer trusts whatever rows are in the export.
