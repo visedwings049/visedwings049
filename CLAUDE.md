@@ -28,6 +28,10 @@ A Streamlit dashboard, growing module by module:
    job-hunting app in use); tracks applications with daily/weekly counts to start,
    more stats to be decided once a real export exists. Export format not yet built —
    see `docs/ACTION_PLAN.md` Module 6.
+7. **Mind Renewal** — not yet scoped here; references an existing local self-help
+   program (thinking-pattern change / neural plasticity work) that a local session
+   should locate and scope, same placeholder treatment as Rip Hunters — see
+   `docs/ACTION_PLAN.md` Module 7.
 
 See the full architecture and build order in `docs/ACTION_PLAN.md`.
 

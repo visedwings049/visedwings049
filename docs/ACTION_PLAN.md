@@ -15,6 +15,7 @@ dashboard/
     4_Card_Hunting.py
     5_Rip_Hunters.py
     6_Job_Search.py
+    7_Mind_Renewal.py
   data/
     dashboard.db          # SQLite (local file, gitignored)
   modules/
@@ -41,6 +42,10 @@ dashboard/
       importer.py               # reads a Skill Surge export (format TBD), upserts applications
       models.py                    # Application(id, company, role, applied_date, status, source)
       service.py                    # daily/weekly counts; further stats TBD
+    mind_renewal/
+      # references the owner's existing local mind-renewal program (thinking
+      # change / neural plasticity self-help work); local Claude session locates
+      # and scopes it, same pattern as rip_hunters
     email/
       sender.py                # Gmail SMTP wrapper (app password, from .env)
       templates/
@@ -172,6 +177,19 @@ Magic: The Gathering.
 - **Open items:** (1) finalize the Skill Surge export format, (2) decide the full
   stat list beyond daily/weekly counts, (3) decide email cadence
 
+## Module 7 — Mind Renewal (self-help / neural plasticity program)
+
+- This module is **not being built fresh** — it references an existing local
+  program the owner built for changing thinking patterns and neural plasticity
+  work. A *local* Claude Code session (not this cloud one) can locate it directly.
+- **Open items (all undecided):** what the program's data actually looks like
+  (sessions completed, exercises, reflections, a rating scale?), what "progress"
+  means for a daily/weekly report, and whether this becomes a tracked-practice
+  module (like Goals) or a read-only view into the existing program.
+- This entry exists so the module isn't forgotten while the rest of the plan is
+  built out; no architecture decisions made here yet — same placeholder treatment
+  as Rip Hunters (Module 5).
+
 ## Build order
 
 1. Scaffold repo + SQLite models + empty Streamlit shell
@@ -200,6 +218,8 @@ Magic: The Gathering.
     counts, Streamlit page
 18. Decide the rest of the stat list + email cadence, then build the report email
     and wire into `run_daily.py`
+19. Locate the existing local Mind Renewal program (local Claude session task) and
+    scope its data model, progress definition, and report format
 
 ## Notes
 
@@ -217,5 +237,7 @@ Magic: The Gathering.
 - Job Search Progress (Module 6) is blocked on the Skill Surge export not existing
   yet — don't start `importer.py` until that export is built and its format known.
   Its stat list beyond daily/weekly counts is also still open.
+- Mind Renewal (Module 7) requires a local session to locate the existing program;
+  same as Rip Hunters, no architecture decisions made until it's scoped locally.
 - This must run locally (not in a cloud session): it stores real login credentials,
   real bank/marketplace API keys, and sends real email on a schedule.
