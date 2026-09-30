@@ -13,6 +13,8 @@ A Streamlit dashboard with two initial modules (more to be added later):
    daily email summary.
 2. **Wade's grades (TeacherEase)** — scrape TeacherEase for Wade's current grades and
    assignment list, flag missing/late work with days-past-due, get a daily email summary.
+3. **Budget & spending** — pull transactions/balances from Era Context's REST API,
+   set budgets per category, track spend vs. budget, get a report email.
 
 See the full architecture and build order in `docs/ACTION_PLAN.md`.
 
@@ -33,6 +35,8 @@ All credentials go in a local `.env` file (already gitignored). Copy `.env.examp
 - `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` — Gmail SMTP app password, not your real
   Google password (generate one at https://myaccount.google.com/apppasswords)
 - `TEACHEREASE_USERNAME`, `TEACHEREASE_PASSWORD`
+- `ERA_CONTEXT_API_KEY` — for the budget module's transaction/balance pulls
+  (requires REST API access on your Era Context plan)
 - `REPORT_TO_EMAIL` — where daily reports get sent
 
 Never print these, log them, or put them in commit messages.

@@ -1,6 +1,6 @@
 # Personal Dashboard — Action Plan
 
-Local-only Streamlit dashboard. More modules will be added beyond the two below;
+Local-only Streamlit dashboard. More modules will be added beyond the ones below;
 each new module follows the same `modules/<name>/` pattern.
 
 ## Architecture
@@ -11,6 +11,7 @@ dashboard/
   pages/
     1_Goals.py
     2_Wade_Grades.py
+    3_Budget.py
   data/
     dashboard.db          # SQLite (local file, gitignored)
   modules/
@@ -21,11 +22,16 @@ dashboard/
       scraper.py            # Playwright login + scrape of TeacherEase
       models.py              # Course, Assignment, GradeSnapshot tables
       service.py              # diff logic: new grades, missing work, days-past-due
+    budget/
+      era_client.py           # Era Context REST API client (transactions, balances)
+      models.py                 # Budget, Category, CategoryMap tables (local cache/overrides)
+      service.py                 # spend-vs-budget calc, categorization, alerts
     email/
       sender.py                # Gmail SMTP wrapper (app password, from .env)
       templates/
         goals_report.html.j2
         grades_report.html.j2
+        budget_report.html.j2
   scheduler/
     run_daily.py            # cron/Task Scheduler entrypoint: scrape + check-ins + send emails
   config/
@@ -35,7 +41,8 @@ dashboard/
 ```
 
 **Stack:** Streamlit (UI) + SQLite via SQLAlchemy (storage) + Playwright
-(TeacherEase login/scrape) + `smtplib` with a Gmail app password (email) + OS-level
+(TeacherEase login/scrape) + Era Context REST API (transactions/balances for the
+budget module) + `smtplib` with a Gmail app password (email) + OS-level
 cron/Task Scheduler (daily trigger — Streamlit doesn't run background jobs itself).
 
 ## Module 1 — Personal Goals Tracker
@@ -60,6 +67,28 @@ cron/Task Scheduler (daily trigger — Streamlit doesn't run background jobs its
 - **Daily email:** all current grades, missing assignments with days overdue, any
   grade that dropped since yesterday's snapshot
 
+## Module 3 — Budget & Spending
+
+- **Data source:** Era Context REST API (the account's connected bank data) —
+  pulls transactions and balances. This is a *different* integration path than the
+  MCP tools used inside this Claude session: the local app is a plain script/service,
+  not a Claude session, so it authenticates to Era Context's REST API directly with
+  its own API key. **Open item:** confirm your Era Context plan tier includes REST
+  API access (per their docs, capabilities are gated by plan — See/Organize/
+  Automate/Optimize), and generate an API key before building `era_client.py`.
+- **Data model:** `Budget(id, category, monthly_limit, period_start)`,
+  `CategoryOverride(transaction_id, category)` — local cache of Era Context
+  transactions plus any manual category corrections, so budgets can be computed
+  without re-hitting the API on every page load
+- **Categorization:** use Era Context's own transaction categories as the default;
+  allow manual override/recategorization in the Streamlit UI, stored locally so it
+  survives re-syncs
+- **Streamlit page:** set/edit monthly budgets per category, spending-vs-budget bars
+  for the current period, transaction list filterable by category/date, trend view
+  (spend per category over past months)
+- **Daily or weekly email:** categories over/near budget, total spend vs. total
+  budget for the period, biggest transactions since last report
+
 ## Build order
 
 1. Scaffold repo + SQLite models + empty Streamlit shell
@@ -69,11 +98,17 @@ cron/Task Scheduler (daily trigger — Streamlit doesn't run background jobs its
    before building the full model)
 5. Grades module: full scrape → store → Streamlit page
 6. Grades daily email
-7. Wire both into `run_daily.py` + cron
+7. Wire goals + grades into `run_daily.py` + cron
+8. Confirm Era Context API access/tier, generate API key, spike `era_client.py`
+   (pull one month of transactions — validate before building the full model)
+9. Budget module: categories, budget-setting UI, spend-vs-budget page
+10. Budget report email, wire into `run_daily.py`
 
 ## Notes
 
 - TeacherEase has no public API — the scraper is the most fragile piece and the one
   most likely to need maintenance after a TeacherEase UI change.
-- This must run locally (not in a cloud session): it stores real login credentials
-  and sends real email on a schedule.
+- The budget module depends on Era Context's REST API being available on your plan —
+  treat step 8 as a feasibility spike before committing to the rest of Module 3.
+- This must run locally (not in a cloud session): it stores real login credentials,
+  real bank API keys, and sends real email on a schedule.
