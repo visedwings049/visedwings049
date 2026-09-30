@@ -29,10 +29,10 @@ dashboard/
       models.py                 # Budget, Category, CategoryMap tables (local cache/overrides)
       service.py                 # spend-vs-budget calc, categorization, alerts
     card_hunting/
-      market_value.py          # derives current market value per card from eBay sold listings
+      market_value.py          # imports market value per card from a Collectr CSV export
       ebay_client.py             # active-listing source for card_hunting — TBD, see Module 4
       models.py                    # TrackedCard, MarketValueSnapshot, DealListing tables
-      service.py                    # >=$30 filter, >=$15-under-market deal detection
+      service.py                    # >=$15-under-market deal detection
     rip_hunters/
       # inventory/value module — references the existing local Rip Hunters Streamlit
       # page already on this machine; local Claude session locates and integrates it
@@ -104,12 +104,17 @@ cron/Task Scheduler (daily trigger — Streamlit doesn't run background jobs its
 Games in scope: Star Wars Unlimited, Cyberpunk CCG, Lorcana, One Piece, Pokemon,
 Magic: The Gathering.
 
-- **Market value source:** derived in-house from **eBay sold/completed listings**
-  (average of recent sold comps per card) rather than a third-party pricing API —
-  decided so the module doesn't depend on TCGplayer/PriceCharting access.
-  `market_value.py` computes and caches this per card.
-- **Card universe filter:** only track cards whose computed market value is
-  **$30 or greater**; anything below that threshold is ignored.
+- **Market value source: Collectr export.** Build a collection in Collectr filtered
+  to cards with market value $30+, then export it (CSV) — Collectr already tracks
+  market value per card, so this replaces the earlier idea of deriving value from
+  eBay sold listings. `market_value.py` becomes a CSV importer: reads the Collectr
+  export, upserts each card + its market value into `TrackedCard` /
+  `MarketValueSnapshot`. Re-running the import (after a fresh Collectr export)
+  refreshes values — this is a manual/periodic re-export, not a live API pull, since
+  Collectr access here is via export file, not an API.
+- **Card universe filter:** the $30+ threshold is applied by how the Collectr
+  collection itself is filtered before export, not recomputed by the app — the
+  importer trusts whatever rows are in the export.
 - **Active-listing source — OPEN ITEM, not yet decided:** the module needs a feed of
   *current, active* eBay listings to compare against market value (separate from the
   sold listings used for market value itself). Two paths considered, not chosen yet:
@@ -121,7 +126,7 @@ Magic: The Gathering.
 - **Deal detection:** `service.py` flags any active listing priced **$15 or more
   below** that card's current computed market value, per game.
 - **Data model:** `TrackedCard(id, game, name, set, variant)`,
-  `MarketValueSnapshot(card_id, value, computed_at, sample_size)`,
+  `MarketValueSnapshot(card_id, value, imported_at, source="collectr_export")`,
   `DealListing(card_id, ebay_item_id, price, discount_vs_market, found_at, url)`
 - **Streamlit page:** browse tracked cards by game, current market value, list of
   live deal listings sorted by biggest discount, link out to each eBay listing
@@ -153,12 +158,12 @@ Magic: The Gathering.
    (pull one month of transactions — validate before building the full model)
 9. Budget module: categories, budget-setting UI, spend-vs-budget page
 10. Budget report email, wire into `run_daily.py`
-11. Decide eBay active-listing access path (Browse API vs. scraping) — feasibility
+11. Build a $30+ collection per game in Collectr, do a test CSV export, and build
+    `market_value.py` as a CSV importer against that sample
+12. Decide eBay active-listing access path (Browse API vs. scraping) — feasibility
     spike before writing `ebay_client.py`
-12. Build `market_value.py` against eBay sold listings for a handful of test cards
-    per game, validate the $30+ filter and averaging approach
-13. Card Hunting module: full card universe per game, deal detection ($15+ under
-    market), Streamlit page
+13. Card Hunting module: wire up Collectr import + deal detection ($15+ under
+    market) + Streamlit page
 14. Card Hunting report email, wire into `run_daily.py`
 15. Locate the existing local Rip Hunters Streamlit page (local Claude session task)
     and decide standalone vs. integrated vs. linked
@@ -170,7 +175,10 @@ Magic: The Gathering.
 - The budget module depends on Era Context's REST API being available on your plan —
   treat step 8 as a feasibility spike before committing to the rest of Module 3.
 - The Card Hunting module's active-listing source (Module 4) is still undecided —
-  don't start `ebay_client.py` until step 11 resolves it.
+  don't start `ebay_client.py` until step 12 resolves it.
+- Card Hunting's market value now comes from a manual Collectr export, not a live
+  API — refreshing values means re-exporting from Collectr and re-running the
+  importer, not an automatic daily pull like the other modules.
 - Rip Hunters (Module 5) requires a local session to locate the existing page; this
   cloud session has no access to the local filesystem where it lives.
 - This must run locally (not in a cloud session): it stores real login credentials,

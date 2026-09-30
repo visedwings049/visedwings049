@@ -17,9 +17,10 @@ A Streamlit dashboard, growing module by module:
    set budgets per category, track spend vs. budget, get a report email.
 4. **Card Hunting (TCG deal finder)** — across Star Wars Unlimited, Cyberpunk CCG,
    Lorcana, One Piece, Pokemon, and Magic: The Gathering: track cards worth $30+
-   (market value derived from eBay sold listings) and surface active eBay listings
-   priced $15+ under that value. Active-listing data source (eBay Browse API vs.
-   scraping) is still undecided — see `docs/ACTION_PLAN.md` Module 4.
+   (market value imported from a Collectr collection export, filtered to $30+ before
+   export) and surface active eBay listings priced $15+ under that value.
+   Active-listing data source (eBay Browse API vs. scraping) is still undecided —
+   see `docs/ACTION_PLAN.md` Module 4.
 5. **Rip Hunters inventory & value** — not yet scoped here; there's already a local
    Streamlit page for this on the owner's machine that a local session should locate
    before deciding whether to keep it standalone or fold it into this dashboard.
